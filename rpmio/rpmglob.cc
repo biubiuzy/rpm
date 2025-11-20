@@ -1,5 +1,3 @@
-#include "system.h"
-
 /* Copyright (C) 1991,92,93,94,95,96,97,98,99 Free Software Foundation, Inc.
 
    This library is free software; you can redistribute it and/or
@@ -63,7 +61,6 @@ int rpmGlobPath(const char * pattern, rpmglobFlags flags,
     int dir_only = (plen > 0 && path[plen-1] == '/');
     glob_t gl;
     int gflags = 0;
-    int i;
     int rc = 0;
 
 #ifdef ENABLE_NLS
@@ -109,7 +106,7 @@ int rpmGlobPath(const char * pattern, rpmglobFlags flags,
     if (rc)
 	goto exit;
 
-    for (i = 0; i < gl.gl_pathc; i++) {
+    for (unsigned i = 0; i < gl.gl_pathc; i++) {
 	if (dir_only && !(flags & RPMGLOB_NOCHECK)) {
 	    struct stat sb;
 	    if (lstat(gl.gl_pathv[i], &sb) || !S_ISDIR(sb.st_mode))

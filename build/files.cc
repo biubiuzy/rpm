@@ -337,7 +337,7 @@ static rpmRC parseForVerify(char * buf, int def, FileEntry entry)
     if ((p = strstr(buf, name)) == NULL)
 	return RPMRC_OK;
 
-    for (pe = p; (pe-p) < strlen(name); pe++)
+    for (pe = p; ptrlen(p,pe) < strlen(name); pe++)
 	*pe = ' ';
 
     SKIPSPACE(pe);
@@ -416,7 +416,7 @@ static rpmRC parseForDev(char * buf, FileEntry cur)
     if ((p = strstr(buf, (name = "%dev"))) == NULL)
 	return RPMRC_OK;
 
-    for (pe = p; (pe-p) < strlen(name); pe++)
+    for (pe = p; ptrlen(p,pe) < strlen(name); pe++)
 	*pe = ' ';
     SKIPSPACE(pe);
 
@@ -518,7 +518,7 @@ static rpmRC parseForAttr(rpmstrPool pool, char * buf, int def, FileEntry entry)
     if ((p = strstr(buf, name)) == NULL)
 	return RPMRC_OK;
 
-    for (pe = p; (pe-p) < strlen(name); pe++)
+    for (pe = p; ptrlen(p,pe) < strlen(name); pe++)
 	*pe = ' ';
 
     SKIPSPACE(pe);
@@ -658,7 +658,7 @@ static rpmRC parseForConfig(char * buf, FileEntry cur)
     cur->attrFlags |= RPMFILE_CONFIG;
 
     /* Erase "%config" token. */
-    for (pe = p; (pe-p) < strlen(name); pe++)
+    for (pe = p; ptrlen(p,pe) < strlen(name); pe++)
 	*pe = ' ';
     SKIPSPACE(pe);
     if (*pe != '(')
@@ -743,7 +743,7 @@ static rpmRC parseForLang(char * buf, FileEntry cur)
 
   while ((p = strstr(buf, (name = "%lang"))) != NULL) {
 
-    for (pe = p; (pe-p) < strlen(name); pe++)
+    for (pe = p; ptrlen(p,pe) < strlen(name); pe++)
 	*pe = ' ';
     SKIPSPACE(pe);
 
@@ -807,7 +807,7 @@ static rpmRC parseForCaps(char * buf, FileEntry cur)
 	return RPMRC_OK;
 
     /* Erase "%caps" token. */
-    for (pe = p; (pe-p) < strlen(name); pe++)
+    for (pe = p; ptrlen(p,pe) < strlen(name); pe++)
 	*pe = ' ';
     SKIPSPACE(pe);
     if (*pe != '(')
@@ -976,12 +976,12 @@ static int isHardLink(FileListRec flp, FileListRec tlp)
  */
 static int checkHardLinks(FileRecords & files)
 {
-    for (int i = 0;  i < files.size(); i++) {
+    for (unsigned int i = 0;  i < files.size(); i++) {
 	FileListRec ilp = &files[i];
 	if (!(isLinkable(ilp->fl_mode) && ilp->fl_nlink > 1))
 	    continue;
 
-	for (int j = i + 1; j < files.size(); j++) {
+	for (unsigned int j = i + 1; j < files.size(); j++) {
 	    FileListRec jlp = &files[j];
 	    if (isHardLink(ilp, jlp)) {
 		return 1;
@@ -1014,7 +1014,7 @@ static void genCpioListAndHeader(FileList fl, rpmSpec spec, Package pkg, int isS
 {
     FileListRec flp;
     char buf[BUFSIZ];
-    int i, npaths = 0;
+    unsigned int i, npaths = 0;
     int fail_on_dupes = rpmExpandNumeric("%{?_duplicate_files_terminate_build}") > 0;
     uint32_t defaultalgo = RPM_HASH_SHA256, digestalgo;
     rpm_loff_t totalFileSize = 0;
@@ -1291,15 +1291,18 @@ static void genCpioListAndHeader(FileList fl, rpmSpec spec, Package pkg, int isS
 
     if (digestalgo != RPM_HASH_MD5) {
 	headerPutUint32(h, RPMTAG_FILEDIGESTALGO, &digestalgo, 1);
-	rpmlibNeedsFeature(pkg, "FileDigests", "4.6.0-1");
+	if (spec->rpmformat < 6)
+	    rpmlibNeedsFeature(pkg, "FileDigests", "4.6.0-1");
     }
 
     if (fl->haveCaps) {
 	rpmlibNeedsFeature(pkg, "FileCaps", "4.6.1-1");
     }
 
-    if (!isSrc && !rpmExpandNumeric("%{_noPayloadPrefix}"))
-	(void) rpmlibNeedsFeature(pkg, "PayloadFilesHavePrefix", "4.0-1");
+    if (!isSrc && !rpmExpandNumeric("%{_noPayloadPrefix}")) {
+	if (spec->rpmformat < 6)
+	    (void) rpmlibNeedsFeature(pkg, "PayloadFilesHavePrefix", "4.0-1");
+    }
 
     /* rpmfiNew() only groks compressed filelists */
     headerConvert(h, HEADERCONV_COMPRESSFILELIST);
@@ -1314,7 +1317,8 @@ static void genCpioListAndHeader(FileList fl, rpmSpec spec, Package pkg, int isS
 	headerConvert(h, HEADERCONV_EXPANDFILELIST);
     } else {
 	/* Binary packages with dirNames cannot be installed by legacy rpm. */
-	(void) rpmlibNeedsFeature(pkg, "CompressedFileNames", "3.0.4-1");
+	if (spec->rpmformat < 6)
+	    (void) rpmlibNeedsFeature(pkg, "CompressedFileNames", "3.0.4-1");
     }
 }
 
@@ -1827,8 +1831,6 @@ static int haveModinfo(Elf *elf)
 static int generateBuildIDs(FileList fl, ARGV_t *files)
 {
     int rc = 0;
-    int i;
-    FileListRec flp;
     std::vector<std::string> ids;
     std::vector<std::string> paths;
 
@@ -1868,12 +1870,12 @@ static int generateBuildIDs(FileList fl, ARGV_t *files)
     /* Collect and check all build-ids for ELF files in this package.  */
     int needMain = 0;
     int needDbg = 0;
-    for (i = 0, flp = fl->files.data(); i < fl->files.size(); i++, flp++) {
+    for (auto & flp : fl->files) {
 	struct stat sbuf;
-	if (lstat(flp->diskPath, &sbuf) == 0 && S_ISREG (sbuf.st_mode)) {
+	if (lstat(flp.diskPath, &sbuf) == 0 && S_ISREG (sbuf.st_mode)) {
 	    /* We determine whether this is a main or
 	       debug ELF based on path.  */
-	    int isDbg = strncmp (flp->cpioPath,
+	    int isDbg = strncmp (flp.cpioPath,
 				 DEBUG_LIB_PREFIX, strlen (DEBUG_LIB_PREFIX)) == 0;
 
 	    /* For the main package files mimic what find-debuginfo.sh does.
@@ -1883,7 +1885,7 @@ static int generateBuildIDs(FileList fl, ARGV_t *files)
 		&& (sbuf.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) == 0)
 	      continue;
 
-	    int fd = open (flp->diskPath, O_RDONLY);
+	    int fd = open (flp.diskPath, O_RDONLY);
 	    if (fd >= 0) {
 		/* Only real ELF files, that are ET_EXEC, ET_DYN or
 		   kernel modules (ET_REL files with .modinfo section)
@@ -1918,7 +1920,7 @@ static int generateBuildIDs(FileList fl, ARGV_t *files)
 			}
 			if (addid) {
 			    char *x = rpmhex((const uint8_t *)build_id, len);
-			    paths.push_back(flp->cpioPath);
+			    paths.push_back(flp.cpioPath);
 			    ids.push_back(x);
 			    free(x);
 			}
@@ -1926,17 +1928,17 @@ static int generateBuildIDs(FileList fl, ARGV_t *files)
 			if (len < 0) {
 			    rpmlog(terminate ? RPMLOG_ERR : RPMLOG_WARNING,
 				   _("error reading build-id in %s: %s\n"),
-				   flp->diskPath, elf_errmsg (-1));
+				   flp.diskPath, elf_errmsg (-1));
 			} else if (len == 0) {
 			      rpmlog(terminate ? RPMLOG_ERR : RPMLOG_WARNING,
 				     _("Missing build-id in %s\n"),
-				     flp->diskPath);
+				     flp.diskPath);
 			} else {
 			    rpmlog(terminate ? RPMLOG_ERR : RPMLOG_WARNING,
 				   (len < 16
 				    ? _("build-id found in %s too small\n")
 				    : _("build-id found in %s too large\n")),
-				   flp->diskPath);
+				   flp.diskPath);
 			}
 			if (terminate)
 			    rc = 1;
@@ -1998,7 +2000,7 @@ static int generateBuildIDs(FileList fl, ARGV_t *files)
 	}
 
 	/* Now add a subdir and symlink for each buildid found.  */
-	for (i = 0; i < ids.size(); i++) {
+	for (unsigned i = 0; i < ids.size(); i++) {
 	    /* Don't add anything more when an error occurred. But do
 	       cleanup.  */
 	    if (rc == 0) {
@@ -2609,7 +2611,7 @@ static rpmRC processPackageFiles(rpmSpec spec, rpmBuildPkgFlags pkgFlags,
 #endif
 
     /* Verify that file attributes scope over hardlinks correctly. */
-    if (checkHardLinks(fl.files))
+    if (checkHardLinks(fl.files) && spec->rpmformat < 6)
 	(void) rpmlibNeedsFeature(pkg, "PartialHardlinkSets", "4.0.4-1");
 
     genCpioListAndHeader(&fl, spec, pkg, 0);

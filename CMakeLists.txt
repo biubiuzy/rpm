@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 project(rpm
-	VERSION 5.99.91
+	VERSION 6.0.90
 	DESCRIPTION "The RPM Package Manager"
 	HOMEPAGE_URL "http://rpm.org"
 	LANGUAGES C CXX
@@ -39,6 +39,7 @@ option(WITH_LIBDW "Build with libdw support" ON)
 option(WITH_LIBELF "Build with libelf support" ON)
 option(WITH_LIBLZMA "Build with liblzma support" ON)
 option(WITH_DOXYGEN "Build API docs with doxygen" OFF)
+option(WITH_WEBSITE "Build standalone website" OFF)
 
 set(RPM_CONFIGDIR "${CMAKE_INSTALL_PREFIX}/lib/rpm" CACHE PATH "rpm home")
 set(RPM_MACROSDIR "${RPM_CONFIGDIR}/macros.d")
@@ -414,7 +415,6 @@ if (ENABLE_WERROR)
 	add_compile_options(-Werror)
 endif()
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-sign-compare")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wmissing-prototypes -Wstrict-prototypes")
 
 if (ENABLE_ASAN)

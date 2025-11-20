@@ -86,8 +86,17 @@ runroot rpmkeys -Kv --nosignature /data/RPMS/hello-1.0-1.i386.rpm
     Payload SHA256 ALT digest: NOTFOUND
     Payload SHA3-256 digest: NOTFOUND
     Payload SHA3-256 ALT digest: NOTFOUND
+    Payload SHA512 digest: NOTFOUND
+    Payload SHA512 ALT digest: NOTFOUND
     Legacy MD5 digest: NOTFOUND
 ],
+[])
+
+RPMTEST_CHECK([
+RPM_TRACE=1 rpmkeys -K --nosignature /data/RPMS/hello-2.0-1.x86_64.rpm 2>&1 | grep -q pgpDigParamsSalt
+],
+[1],
+[],
 [])
 RPMTEST_CLEANUP
 
@@ -175,6 +184,26 @@ runroot rpm -qa gpg-pubkey
 [],
 [warning: erasing gpg-pubkey packages is deprecated; use rpmkeys --delete 771b18d3d7baa28734333c424344591e1964c5fc
 ])
+RPMTEST_CLEANUP
+
+RPMTEST_SETUP_RW([rpmkeys legacy key delete (rpmdb)])
+AT_KEYWORDS([rpmkeys rpmdb])
+echo "%_keyring rpmdb" >> "${RPMTEST}"/"${RPMSYSCONFDIR}"/macros.testenv
+RPMTEST_CHECK([
+runroot rpm -q --dbpath /data/misc/ gpg-pubkey
+],
+[0],
+[gpg-pubkey-1964c5fc-58e63918
+],
+[])
+
+RPMTEST_CHECK([
+runroot rpmkeys --dbpath /data/misc/ --delete 771b18d3d7baa28734333c424344591e1964c5fc
+runroot rpmkeys --dbpath /data/misc/ --list
+],
+[0],
+[],
+[])
 RPMTEST_CLEANUP
 
 RPMTEST_SETUP_RW([rpmkeys migrate from keyid to fingerprint (rpmdb)])
@@ -552,6 +581,8 @@ runroot rpmkeys -Kv --nosignature /tmp/${pkg}
     Payload SHA256 ALT digest: NOTFOUND
     Payload SHA3-256 digest: NOTFOUND
     Payload SHA3-256 ALT digest: NOTFOUND
+    Payload SHA512 digest: NOTFOUND
+    Payload SHA512 ALT digest: NOTFOUND
     Legacy MD5 digest: NOTFOUND
 ],
 [])
@@ -603,19 +634,19 @@ runroot rpmkeys \
 runroot rpm -qi gpg-pubkey-771b18d3d7baa28734333c424344591e1964c5fc-58e63918|grep -v Date|grep -v Version:
 runroot rpm -q --provides gpg-pubkey-771b18d3d7baa28734333c424344591e1964c5fc-58e63918],
 [0],
-[Name        : gpg-pubkey
-Version     : 771b18d3d7baa28734333c424344591e1964c5fc
-Release     : 58e63918
-Architecture: (none)
-Group       : Public Keys
-Size        : 0
-License     : pubkey
-Signature   : (none)
-Source RPM  : (none)
-Build Host  : localhost
-Packager    : rpm.org RSA testkey <rsa@rpm.org>
-Summary     : rpm.org RSA testkey <rsa@rpm.org> public key
-Description :
+[Name         : gpg-pubkey
+Version      : 771b18d3d7baa28734333c424344591e1964c5fc
+Release      : 58e63918
+Architecture : (none)
+Group        : Public Keys
+Size         : 0
+License      : pubkey
+Signature    : (none)
+Source RPM   : (none)
+Build Host   : localhost
+Packager     : rpm.org RSA testkey <rsa@rpm.org>
+Summary      : rpm.org RSA testkey <rsa@rpm.org> public key
+Description  :
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQENBFjmORgBCAC7TMEk6wnjSs8Dr4yqSScWdU2pjcqrkTxuzdWvowcIUPZI0w/g
@@ -746,6 +777,8 @@ Checking package after importing key, no digest:
     Payload SHA256 ALT digest: NOTFOUND
     Payload SHA3-256 digest: NOTFOUND
     Payload SHA3-256 ALT digest: NOTFOUND
+    Payload SHA512 digest: NOTFOUND
+    Payload SHA512 ALT digest: NOTFOUND
     Legacy OpenPGP RSA signature: NOTFOUND
     Legacy OpenPGP DSA signature: NOTFOUND
 1
@@ -963,19 +996,19 @@ runroot rpm -qi gpg-pubkey-2f38916f5e77cf307b338596a72b7d4f62837bea-62553e62|gre
 runroot rpm -q --provides gpg-pubkey
 ],
 [0],
-[[Name        : gpg-pubkey
-Version     : 2f38916f5e77cf307b338596a72b7d4f62837bea
-Release     : 62553e62
-Architecture: (none)
-Group       : Public Keys
-Size        : 0
-License     : pubkey
-Signature   : (none)
-Source RPM  : (none)
-Build Host  : localhost
-Packager    : Alice Lovelace <alice@example.org>
-Summary     : Alice Lovelace <alice@example.org> public key
-Description :
+[[Name         : gpg-pubkey
+Version      : 2f38916f5e77cf307b338596a72b7d4f62837bea
+Release      : 62553e62
+Architecture : (none)
+Group        : Public Keys
+Size         : 0
+License      : pubkey
+Signature    : (none)
+Source RPM   : (none)
+Build Host   : localhost
+Packager     : Alice Lovelace <alice@example.org>
+Summary      : Alice Lovelace <alice@example.org> public key
+Description  :
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQGNBGJVPmIBDADbcjK3GTdWRlzChFeT0NPjQCrKJrKwNfUWRQjgi5x1nhh+N0aG
@@ -1263,6 +1296,8 @@ runroot rpmkeys -Kv /tmp/${pkg}
     Payload SHA256 ALT digest: NOTFOUND
     Payload SHA3-256 digest: NOTFOUND
     Payload SHA3-256 ALT digest: NOTFOUND
+    Payload SHA512 digest: NOTFOUND
+    Payload SHA512 ALT digest: NOTFOUND
     Legacy OpenPGP V4 RSA/SHA256 signature, key ID 4344591e1964c5fc: BAD
     Legacy OpenPGP DSA signature: NOTFOUND
     Legacy MD5 digest: NOTFOUND
@@ -1273,6 +1308,8 @@ runroot rpmkeys -Kv /tmp/${pkg}
     Payload SHA256 ALT digest: NOTFOUND
     Payload SHA3-256 digest: NOTFOUND
     Payload SHA3-256 ALT digest: NOTFOUND
+    Payload SHA512 digest: NOTFOUND
+    Payload SHA512 ALT digest: NOTFOUND
     Legacy OpenPGP V4 RSA/SHA256 signature, key fingerprint: 771b18d3d7baa28734333c424344591e1964c5fc: BAD
     Legacy OpenPGP DSA signature: NOTFOUND
     Legacy MD5 digest: NOTFOUND
@@ -1314,6 +1351,8 @@ dorpm -Kv
     Payload SHA256 ALT digest: NOTFOUND
     Payload SHA3-256 digest: NOTFOUND
     Payload SHA3-256 ALT digest: NOTFOUND
+    Payload SHA512 digest: NOTFOUND
+    Payload SHA512 ALT digest: NOTFOUND
     Legacy OpenPGP RSA signature: NOTFOUND
     Legacy OpenPGP DSA signature: NOTFOUND
     Legacy MD5 digest: OK
@@ -1426,7 +1465,7 @@ RPMTEST_CHECK([
 RPMKEYRING_RESET
 
 cp "${RPMTEST}"/data/RPMS/hello-2.0-1.x86_64-signed.rpm "${RPMTEST}"/tmp/
-runroot rpmsign --key-id 4344591E1964C5FC --digest-algo sha256 --addsign /tmp/hello-2.0-1.x86_64-signed.rpm 2>&1 |grep -q "already contains identical signature, skipping"
+runroot rpmsign --key-id 4344591E1964C5FC --digest-algo sha256 --addsign /tmp/hello-2.0-1.x86_64-signed.rpm 2>&1 |grep -q "already contains an identical signature, skipping"
 ],
 [0],
 [],
@@ -1494,6 +1533,8 @@ runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
     Payload SHA256 ALT digest: NOTFOUND
     Payload SHA3-256 digest: NOTFOUND
     Payload SHA3-256 ALT digest: NOTFOUND
+    Payload SHA512 digest: NOTFOUND
+    Payload SHA512 ALT digest: NOTFOUND
     Legacy OpenPGP RSA signature: NOTFOUND
     Legacy OpenPGP DSA signature: NOTFOUND
     Legacy MD5 digest: NOTFOUND
@@ -1646,6 +1687,44 @@ runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
 ],
 [])
 
+# corrupt each of the signatures and verify it does not pass
+RPMTEST_CHECK([
+pkg="hello-corrupt-2.0-1.x86_64.rpm"
+runroot cp /tmp/hello-2.0-1.x86_64.rpm /tmp/${pkg}
+runroot python3 /data/misc/rpmsig-corruptor.py /tmp/${pkg} 0
+runroot rpmkeys -Kv /tmp/hello-corrupt-2.0-1.x86_64.rpm; echo $?
+runroot cp /tmp/hello-2.0-1.x86_64.rpm /tmp/${pkg}
+runroot python3 /data/misc/rpmsig-corruptor.py /tmp/${pkg} 1
+runroot rpmkeys -Kv /tmp/hello-corrupt-2.0-1.x86_64.rpm; echo $?
+runroot cp /tmp/hello-2.0-1.x86_64.rpm /tmp/${pkg}
+runroot python3 /data/misc/rpmsig-corruptor.py /tmp/${pkg} 2
+runroot rpmkeys -Kv /tmp/hello-corrupt-2.0-1.x86_64.rpm; echo $?
+],
+[0],
+[/tmp/hello-corrupt-2.0-1.x86_64.rpm:
+    Header OpenPGP V4 ECDSA/SHA512 signature, key fingerprint: e8a62c0512b06b5d2183ba207f1c21f95f65bbe8: OK
+    Header OpenPGP V4 EdDSA/SHA512 signature, key fingerprint: 152bb32fd9ca982797e835cfb0645aec757bf69e: OK
+    Header OpenPGP V4 RSA/SHA512 signature, key fingerprint: 771b18d3d7baa28734333c424344591e1964c5fc: BAD
+    Header SHA256 digest: OK
+    Payload SHA256 digest: OK
+1
+/tmp/hello-corrupt-2.0-1.x86_64.rpm:
+    Header OpenPGP V4 ECDSA/SHA512 signature, key fingerprint: e8a62c0512b06b5d2183ba207f1c21f95f65bbe8: OK
+    Header OpenPGP V4 EdDSA/SHA512 signature, key fingerprint: 152bb32fd9ca982797e835cfb0645aec757bf69e: BAD
+    Header OpenPGP V4 RSA/SHA512 signature, key fingerprint: 771b18d3d7baa28734333c424344591e1964c5fc: OK
+    Header SHA256 digest: OK
+    Payload SHA256 digest: OK
+1
+/tmp/hello-corrupt-2.0-1.x86_64.rpm:
+    Header OpenPGP V4 ECDSA/SHA512 signature, key fingerprint: e8a62c0512b06b5d2183ba207f1c21f95f65bbe8: BAD
+    Header OpenPGP V4 EdDSA/SHA512 signature, key fingerprint: 152bb32fd9ca982797e835cfb0645aec757bf69e: OK
+    Header OpenPGP V4 RSA/SHA512 signature, key fingerprint: 771b18d3d7baa28734333c424344591e1964c5fc: OK
+    Header SHA256 digest: OK
+    Payload SHA256 digest: OK
+1
+],
+[])
+
 RPMTEST_CHECK([
 runroot rpmkeys --delete 152bb32fd9ca982797e835cfb0645aec757bf69e
 runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
@@ -1725,7 +1804,6 @@ runroot rpmbuild -bb --quiet \
 [],
 [])
 
-# XXX the reserve tag size is currently WRONG here due to #3768
 RPMTEST_CHECK([
 cp /data/misc/rpmdump6-addsign-v6.txt expout
 runroot ${RPM_CONFIGDIR_PATH}/rpmdump /build/RPMS/noarch/attrtest-1.0-1.noarch.rpm| sed -n '/^Signature:$/,/^Header:$/p'
@@ -1797,6 +1875,283 @@ runroot ${RPM_CONFIGDIR_PATH}/rpmdump /build/RPMS/noarch/attrtest-1.0-1.noarch.r
 ],
 [0],
 [expout],
+[])
+RPMTEST_CLEANUP
+
+RPMTEST_SETUP_RW([rpmsign --addsign legacy v4])
+AT_KEYWORDS([rpmsign signature legacy v4])
+RPMTEST_SKIP_IF([test x$PGP = xdummy])
+
+cat << EOF > ${HOME}/.config/rpm/macros
+%_openpgp_sign sq
+EOF
+runroot sq key import /data/keys/*.secret
+runroot rpmkeys --import /data/keys/*.pub
+
+# Add native v4 signature to package with native v4 signature (identical)
+RPMTEST_CHECK([
+cp "${RPMTEST}"/data/RPMS/hello-2.0-1.x86_64.rpm "${RPMTEST}"/test.rpm
+runroot rpmsign --addsign --key-id 771B18D3D7BAA28734333C424344591E1964C5FC test.rpm
+runroot rpmsign --addsign --key-id 771B18D3D7BAA28734333C424344591E1964C5FC test.rpm; rc=$?
+runroot rpm -qp --qf '%{rsaheader:pgpsig}\n' test.rpm | sed 's/, .\+,/,/'
+runroot ${RPM_CONFIGDIR_PATH}/rpmdump test.rpm | grep 'Rsa' | xargs -n3
+exit $rc
+],
+[0],
+[RSA/SHA512, Key ID 4344591e1964c5fc
+tagno: 268 (Rsa)
+],
+[warning: test.rpm already contains an identical signature, skipping
+])
+
+# Add native v4 signature to package with native v4 signature (same algo)
+RPMTEST_CHECK([
+cp "${RPMTEST}"/data/RPMS/hello-2.0-1.x86_64.rpm "${RPMTEST}"/test.rpm
+runroot rpmsign --addsign --key-id 152BB32FD9CA982797E835CFB0645AEC757BF69E test.rpm
+runroot rpmsign --addsign --key-id E8A62C0512B06B5D2183BA207F1C21F95F65BBE8 test.rpm; rc=$?
+runroot rpm -qp --qf '%{dsaheader:pgpsig}\n' test.rpm | sed 's/, .\+,/,/'
+runroot ${RPM_CONFIGDIR_PATH}/rpmdump test.rpm | grep 'Dsa' | xargs -n3
+exit $rc
+],
+[1],
+[EdDSA/SHA512, Key ID b0645aec757bf69e
+tagno: 267 (Dsa)
+],
+[error: test.rpm already contains a legacy signature
+])
+
+# Add native v4 signature to package with native v4 signature (different algo)
+RPMTEST_CHECK([
+cp "${RPMTEST}"/data/RPMS/hello-2.0-1.x86_64.rpm "${RPMTEST}"/test.rpm
+runroot rpmsign --addsign --key-id 771B18D3D7BAA28734333C424344591E1964C5FC test.rpm
+runroot rpmsign --addsign --key-id E8A62C0512B06B5D2183BA207F1C21F95F65BBE8 test.rpm; rc=$?
+runroot rpm -qp --qf '%{rsaheader:pgpsig}\n%{dsaheader:pgpsig}\n' test.rpm | sed 's/, .\+,/,/'
+runroot ${RPM_CONFIGDIR_PATH}/rpmdump test.rpm | grep '(Rsa\|Dsa)' | xargs -n3
+exit $rc
+],
+[1],
+[RSA/SHA512, Key ID 4344591e1964c5fc
+(none)
+tagno: 268 (Rsa)
+],
+[error: test.rpm already contains a legacy signature
+])
+
+# Add compat v4 signature to package with native v4 signature (identical)
+RPMTEST_CHECK([
+cp "${RPMTEST}"/data/RPMS/hello-2.0-1.x86_64.rpm "${RPMTEST}"/test.rpm
+runroot rpmsign --addsign --key-id 771B18D3D7BAA28734333C424344591E1964C5FC test.rpm
+runroot rpmsign --addsign --rpmv6 --key-id 771B18D3D7BAA28734333C424344591E1964C5FC test.rpm; rc=$?
+runroot rpm -qp --qf '%{rsaheader:pgpsig}\n' test.rpm | sed 's/, .\+,/,/'
+runroot ${RPM_CONFIGDIR_PATH}/rpmdump test.rpm | grep 'Rsa' | xargs -n3
+exit $rc
+],
+[0],
+[RSA/SHA512, Key ID 4344591e1964c5fc
+tagno: 268 (Rsa)
+],
+[])
+
+# Add compat v4 signature to package with native v4 signature (different algo)
+RPMTEST_CHECK([
+cp "${RPMTEST}"/data/RPMS/hello-2.0-1.x86_64.rpm "${RPMTEST}"/test.rpm
+runroot rpmsign --addsign --key-id 771B18D3D7BAA28734333C424344591E1964C5FC test.rpm
+runroot rpmsign --addsign --rpmv6 --key-id E8A62C0512B06B5D2183BA207F1C21F95F65BBE8 test.rpm; rc=$?
+runroot rpm -qp --qf '%{rsaheader:pgpsig}\n%{dsaheader:pgpsig}\n' test.rpm | sed 's/, .\+,/,/'
+runroot ${RPM_CONFIGDIR_PATH}/rpmdump test.rpm | grep '(Rsa\|Dsa)' | xargs -n3
+exit $rc
+],
+[0],
+[RSA/SHA512, Key ID 4344591e1964c5fc
+(none)
+tagno: 268 (Rsa)
+],
+[])
+
+# Resign with compat v4 signature
+RPMTEST_CHECK([
+cp "${RPMTEST}"/data/RPMS/hello-2.0-1.x86_64.rpm "${RPMTEST}"/test.rpm
+runroot rpmsign --addsign --key-id 771B18D3D7BAA28734333C424344591E1964C5FC test.rpm
+runroot rpm -qp --qf '%{rsaheader:pgpsig}\n' test.rpm | sed 's/, .\+,/,/'
+runroot ${RPM_CONFIGDIR_PATH}/rpmdump test.rpm | grep 'Rsa' | xargs -n3
+runroot rpmsign --resign --rpmv6 --key-id E8A62C0512B06B5D2183BA207F1C21F95F65BBE8 test.rpm; rc=$?
+runroot rpm -qp --qf '%{dsaheader:pgpsig}\n' test.rpm | sed 's/, .\+,/,/'
+runroot ${RPM_CONFIGDIR_PATH}/rpmdump test.rpm | grep '(Rsa\|Dsa)' | xargs -n3
+exit $rc
+],
+[0],
+[RSA/SHA512, Key ID 4344591e1964c5fc
+tagno: 268 (Rsa)
+ECDSA/SHA512, Key ID 7f1c21f95f65bbe8
+tagno: 267 (Dsa)
+],
+[])
+RPMTEST_CLEANUP
+
+RPMTEST_SETUP_RW([multisign with disabled algorithms])
+AT_KEYWORDS([rpmsign signature multisig v4])
+RPMTEST_SKIP_IF([test x$PGP = xdummy])
+
+RPMTEST_CHECK([
+cat << EOF > ${HOME}/.config/rpm/macros
+%_openpgp_sign sq
+%_openpgp_sign_id 771B18D3D7BAA28734333C424344591E1964C5FC
+EOF
+
+runroot sq key import /data/keys/*.secret
+runroot rpmkeys --import /data/keys/*.pub
+
+cp "${RPMTEST}"/data/RPMS/hello-2.0-1.x86_64.rpm "${RPMTEST}"/tmp/
+runroot rpmsign --addsign --rpmv6 /tmp/hello-2.0-1.x86_64.rpm &> /dev/null
+runroot rpmsign --addsign --rpmv6 --key-id 152BB32FD9CA982797E835CFB0645AEC757BF69E /tmp/hello-2.0-1.x86_64.rpm &> /dev/null
+runroot rpmsign --addsign --rpmv6 --key-id E8A62C0512B06B5D2183BA207F1C21F95F65BBE8 /tmp/hello-2.0-1.x86_64.rpm &> /dev/null
+],
+[0],
+[ignore],
+[ignore])
+
+RPMTEST_CHECK([
+runroot rpm -Uv --test --nodeps /tmp/hello-2.0-1.x86_64.rpm
+],
+[0],
+[Verifying packages...
+Preparing packages...
+],
+[ignore])
+
+# RSA disabled
+RPMTEST_CHECK([
+runroot cp /etc/crypto-policies/back-ends/rpm-sequoia.config /tmp/
+runroot sed -i '/^rsa/s/always/never/g' /etc/crypto-policies/back-ends/rpm-sequoia.config
+runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
+],
+[0],
+[/tmp/hello-2.0-1.x86_64.rpm:
+    Header OpenPGP V4 ECDSA/SHA512 signature, key fingerprint: e8a62c0512b06b5d2183ba207f1c21f95f65bbe8: OK
+    Header OpenPGP V4 EdDSA/SHA512 signature, key fingerprint: 152bb32fd9ca982797e835cfb0645aec757bf69e: OK
+    Header OpenPGP V4 RSA/SHA512 signature, key fingerprint: 771b18d3d7baa28734333c424344591e1964c5fc: NOTTRUSTED
+    Header SHA256 digest: OK
+    Payload SHA256 digest: OK
+],
+[ignore])
+
+RPMTEST_CHECK([
+runroot rpm -Uv --test --nodeps /tmp/hello-2.0-1.x86_64.rpm
+],
+[0],
+[Verifying packages...
+Preparing packages...
+],
+[ignore])
+
+# EDDSA disabled
+RPMTEST_CHECK([
+runroot cp -f /tmp/rpm-sequoia.config /etc/crypto-policies/back-ends/
+# Work around https://gitlab.com/sequoia-pgp/sequoia/-/issues/1225
+# Disabling cv25519 disables ed25519, but disabling ed25519 does not:
+runroot sed -i '/^cv25519/s/always/never/g' /etc/crypto-policies/back-ends/rpm-sequoia.config
+runroot sed -i '/^ed25519/s/always/never/g' /etc/crypto-policies/back-ends/rpm-sequoia.config
+runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
+],
+[0],
+[/tmp/hello-2.0-1.x86_64.rpm:
+    Header OpenPGP V4 ECDSA/SHA512 signature, key fingerprint: e8a62c0512b06b5d2183ba207f1c21f95f65bbe8: OK
+    Header OpenPGP V4 EdDSA/SHA512 signature, key fingerprint: 152bb32fd9ca982797e835cfb0645aec757bf69e: NOTTRUSTED
+    Header OpenPGP V4 RSA/SHA512 signature, key fingerprint: 771b18d3d7baa28734333c424344591e1964c5fc: OK
+    Header SHA256 digest: OK
+    Payload SHA256 digest: OK
+],
+[ignore])
+
+RPMTEST_CHECK([
+runroot rpm -Uv --test --nodeps /tmp/hello-2.0-1.x86_64.rpm
+],
+[0],
+[Verifying packages...
+Preparing packages...
+],
+[ignore])
+
+# ECDSA disabled
+RPMTEST_CHECK([
+runroot cp -f /tmp/rpm-sequoia.config /etc/crypto-policies/back-ends/
+runroot sed -i '/^nist/s/always/never/g' /etc/crypto-policies/back-ends/rpm-sequoia.config
+runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
+],
+[0],
+[/tmp/hello-2.0-1.x86_64.rpm:
+    Header OpenPGP V4 ECDSA/SHA512 signature, key fingerprint: e8a62c0512b06b5d2183ba207f1c21f95f65bbe8: NOTTRUSTED
+    Header OpenPGP V4 EdDSA/SHA512 signature, key fingerprint: 152bb32fd9ca982797e835cfb0645aec757bf69e: OK
+    Header OpenPGP V4 RSA/SHA512 signature, key fingerprint: 771b18d3d7baa28734333c424344591e1964c5fc: OK
+    Header SHA256 digest: OK
+    Payload SHA256 digest: OK
+],
+[ignore])
+
+RPMTEST_CHECK([
+runroot rpm -Uv --test --nodeps /tmp/hello-2.0-1.x86_64.rpm
+],
+[0],
+[Verifying packages...
+Preparing packages...
+],
+[ignore])
+
+# everything disabled
+RPMTEST_CHECK([
+runroot cp -f /tmp/rpm-sequoia.config /etc/crypto-policies/back-ends/
+runroot sed -i 's/always/never/g' /etc/crypto-policies/back-ends/rpm-sequoia.config
+runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
+],
+[1],
+[/tmp/hello-2.0-1.x86_64.rpm:
+    Header OpenPGP V4 ECDSA/SHA512 signature, key fingerprint: e8a62c0512b06b5d2183ba207f1c21f95f65bbe8: NOTTRUSTED
+    Header OpenPGP V4 EdDSA/SHA512 signature, key fingerprint: 152bb32fd9ca982797e835cfb0645aec757bf69e: NOTTRUSTED
+    Header OpenPGP V4 RSA/SHA512 signature, key fingerprint: 771b18d3d7baa28734333c424344591e1964c5fc: NOTTRUSTED
+    Header OpenPGP RSA signature: NOTFOUND
+    Header OpenPGP DSA signature: NOTFOUND
+    Header SHA256 digest: OK
+    Payload SHA256 digest: OK
+    Legacy OpenPGP RSA signature: NOTFOUND
+    Legacy OpenPGP DSA signature: NOTFOUND
+],
+[ignore])
+
+RPMTEST_CHECK([
+runroot rpm -Uv --test --nodeps /tmp/hello-2.0-1.x86_64.rpm
+],
+[1],
+[Verifying packages...
+Preparing packages...
+],
+[ignore])
+RPMTEST_CLEANUP
+
+RPMTEST_SETUP_RW([rpmsign --addsign legacy v6])
+AT_KEYWORDS([rpmsign signature legacy v6])
+RPMTEST_SKIP_IF([test x$PGP = xdummy])
+
+cat << EOF > ${HOME}/.config/rpm/macros
+%_openpgp_sign sq
+EOF
+runroot sq key import /data/keys/*.secret
+runroot rpmkeys --import /data/keys/*.pub
+runroot rpmbuild -bb --quiet --define "_rpmformat 6" /data/SPECS/attrtest.spec
+
+# Add compat v4 signature to package with compat v4 signature (different algo)
+RPMTEST_CHECK([
+cp "${RPMTEST}"/build/RPMS/noarch/attrtest-1.0-1.noarch.rpm "${RPMTEST}"/test.rpm
+runroot rpmsign --addsign --rpmv4 --key-id 771B18D3D7BAA28734333C424344591E1964C5FC test.rpm
+runroot rpmsign --addsign --rpmv4 --key-id E8A62C0512B06B5D2183BA207F1C21F95F65BBE8 test.rpm; rc=$?
+runroot rpm -qp --qf '%{rsaheader:pgpsig}\n%{dsaheader:pgpsig}\n' test.rpm | sed 's/, .\+,/,/'
+runroot ${RPM_CONFIGDIR_PATH}/rpmdump test.rpm | grep '(Rsa\|Dsa)' | xargs -n3
+exit $rc
+],
+[0],
+[RSA/SHA512, Key ID 4344591e1964c5fc
+(none)
+tagno: 268 (Rsa)
+],
 [])
 RPMTEST_CLEANUP
 
@@ -2375,7 +2730,7 @@ SHA512 5e0a11bf9c4f353b9197446d722e66cc322030e164929356e3fb669201597be77f3a44b4b
 [])
 RPMTEST_CLEANUP
 
-RPMTEST_SETUP_RW([openpgp v6 keys and signatures])
+RPMTEST_SETUP_RW([openpgp v6 keys and signatures ed25519])
 AT_KEYWORDS([rpmsign sequoia signature v6])
 RPMTEST_SKIP_IF([test x$PGP = xdummy])
 
@@ -2457,3 +2812,112 @@ runroot rpmkeys --delete 036824f0ac60aed6f1a3256f88190469f6d7255e3d8e41c577233aa
 [])
 RPMTEST_CLEANUP
 
+RPMTEST_SETUP_RW([openpgp v6 keys and signatures rsa])
+AT_KEYWORDS([rpmsign sequoia signature v6])
+RPMTEST_SKIP_IF([test x$PGP = xdummy])
+
+RPMTEST_CHECK([
+cat << EOF > ${HOME}/.config/rpm/macros
+%_openpgp_sign sq
+%_openpgp_sign_id B0C818335157193717C146BC4092292808D5C705710509340033080EBE457ECA
+%_sq_path ${HOME}/.config/rpm/sq
+EOF
+
+runroot sq --home ${HOME}/.config/rpm/sq key import /data/keys/*v6*.secret
+],
+[0],
+[ignore],
+[ignore])
+
+RPMTEST_CHECK([
+cp "${RPMTEST}"/data/RPMS/hello-2.0-1.x86_64.rpm "${RPMTEST}"/tmp/
+runroot rpmsign --addsign /tmp/hello-2.0-1.x86_64.rpm
+],
+[1],
+[],
+[error: Unsupported OpenPGP version 6 for rpm v3/v4 signatures
+])
+
+RPMTEST_CHECK([
+runroot rpmsign --addsign --rpmv6 /tmp/hello-2.0-1.x86_64.rpm
+],
+[0],
+[],
+[])
+
+RPMTEST_CHECK([
+runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
+],
+[1],
+[/tmp/hello-2.0-1.x86_64.rpm:
+    Header OpenPGP V6 RSA/SHA512 signature, key ID 0a25ec5925ee7635: NOKEY
+    Header OpenPGP RSA signature: NOTFOUND
+    Header OpenPGP DSA signature: NOTFOUND
+    Header SHA256 digest: OK
+    Payload SHA256 digest: OK
+    Legacy OpenPGP RSA signature: NOTFOUND
+    Legacy OpenPGP DSA signature: NOTFOUND
+],
+[])
+
+RPMTEST_CHECK([
+runroot rpmkeys --import /data/keys/rpm.org-v6-rsa4k-test.asc
+],
+[0],
+[],
+[])
+
+RPMTEST_CHECK([
+runroot rpmkeys --list b0c818335157193717c146bc4092292808d5c705710509340033080ebe457eca
+],
+[0],
+[b0c818335157193717c146bc4092292808d5c705710509340033080ebe457eca v6-rsa4k-testkey public key
+],
+[])
+
+RPMTEST_CHECK([
+runroot rpmkeys -Kv /tmp/hello-2.0-1.x86_64.rpm
+],
+[0],
+[/tmp/hello-2.0-1.x86_64.rpm:
+    Header OpenPGP V6 RSA/SHA512 signature, key fingerprint: b0c818335157193717c146bc4092292808d5c705710509340033080ebe457eca: OK
+    Header SHA256 digest: OK
+    Payload SHA256 digest: OK
+],
+[])
+
+RPMTEST_CHECK([
+runroot rpmkeys --delete b0c818335157193717c146bc4092292808d5c705710509340033080ebe457eca
+],
+[0],
+[],
+[])
+RPMTEST_CLEANUP
+
+RPMTEST_SETUP_RW([v3 signature in v6 package])
+AT_KEYWORDS([signature v6])
+
+RPMTEST_CHECK([[
+runroot rpmkeys --import /data/keys/rpm.org-rsa-2048-test.pub
+runroot rpm -qp --qf "[%{openpgp:pgpsig}\n]" /data/RPMS/hlinktest-1.0-1.noarch-v3sig.rpm
+]],
+[0],
+[RSA/SHA512, Tue Sep  9 12:41:21 2025, Key ID 4344591e1964c5fc
+],
+[])
+
+RPMTEST_CHECK([
+runroot rpmkeys -Kv /data/RPMS/hlinktest-1.0-1.noarch-v3sig.rpm
+],
+[0],
+[/data/RPMS/hlinktest-1.0-1.noarch-v3sig.rpm:
+    Header OpenPGP V4 RSA/SHA512 signature, key fingerprint: 771b18d3d7baa28734333c424344591e1964c5fc: OK
+    Header SHA3-256 digest: OK
+    Header SHA256 digest: OK
+    Payload SHA3-256 digest: OK
+    Payload SHA512 digest: OK
+    Payload SHA256 digest: OK
+],
+[])
+
+RPMTEST_CLEANUP

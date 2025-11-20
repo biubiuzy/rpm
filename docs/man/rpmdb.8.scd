@@ -39,7 +39,7 @@ The *rpmdb* is used for *rpm* database maintenance operations.
 
 *--importdb*
 	Imports a database from a header-list format as created
-	by *--exportdb*. The data is reaad from standard input.
+	by *--exportdb*. The data is read from standard input.
 
 # OPTIONS
 See *rpm-common*(8) for the options common to all *rpm* executables.
@@ -51,7 +51,7 @@ but in particular the following (see *rpm-config*(5) for details):
 - *%\_db_backend*
 
 # EXIT STATUS
-On success, 0 is returned, a non-zero failure code otherwise.
+On success, 0 is returned, a nonzero failure code otherwise.
 
 # EXAMPLES
 *rpmdb --initdb --dbpath /tmp/testdb*

@@ -25,7 +25,6 @@ static struct rpmBuildArguments_s rpmBTArgs;
 #define	POPT_TARGETPLATFORM	-1016
 #define	POPT_NOBUILD		-1017
 #define	POPT_RMSPEC		-1019
-#define POPT_NODIRTOKENS	-1020
 
 #define	POPT_REBUILD		0x4262 /* Bb */
 #define	POPT_RECOMPILE		0x4369 /* Ci */
@@ -35,6 +34,7 @@ static struct rpmBuildArguments_s rpmBTArgs;
 #define	POPT_BD			0x6264
 #define	POPT_BF			0x6266
 #define	POPT_BI			0x6269
+#define	POPT_BK			0x626b
 #define	POPT_BL			0x626c
 #define	POPT_BP			0x6270
 #define	POPT_BS			0x6273
@@ -45,6 +45,7 @@ static struct rpmBuildArguments_s rpmBTArgs;
 #define	POPT_RD			0x4264
 #define	POPT_RF			0x4266
 #define	POPT_RI			0x4269
+#define	POPT_RK			0x426b
 #define	POPT_RL			0x426c
 #define	POPT_RP			0x4270
 #define	POPT_RS			0x4273
@@ -55,6 +56,7 @@ static struct rpmBuildArguments_s rpmBTArgs;
 #define	POPT_TD			0x7464
 #define	POPT_TF			0x7466
 #define	POPT_TI			0x7469
+#define	POPT_TK			0x746b
 #define	POPT_TL			0x746c
 #define	POPT_TP			0x7470
 #define	POPT_TS			0x7473
@@ -94,6 +96,7 @@ static void buildArgCallback( poptContext con,
     case POPT_BD:
     case POPT_BF:
     case POPT_BI:
+    case POPT_BK:
     case POPT_BL:
     case POPT_BP:
     case POPT_RA:
@@ -102,6 +105,7 @@ static void buildArgCallback( poptContext con,
     case POPT_RD:
     case POPT_RF:
     case POPT_RI:
+    case POPT_RK:
     case POPT_RL:
     case POPT_RP:
     case POPT_TA:
@@ -110,6 +114,7 @@ static void buildArgCallback( poptContext con,
     case POPT_TD:
     case POPT_TF:
     case POPT_TI:
+    case POPT_TK:
     case POPT_TL:
     case POPT_TP:
 	if (opt->val == POPT_BS || opt->val == POPT_TS)
@@ -120,7 +125,6 @@ static void buildArgCallback( poptContext con,
 	}
 	break;
 
-    case POPT_NODIRTOKENS: rba->pkgFlags |= RPMBUILD_PKG_NODIRTOKENS; break;
     case POPT_NOBUILD: rba->buildAmount |= RPMBUILD_NOBUILD; break;
     case POPT_NOLANG: spec_flags |= RPMSPEC_NOLANG; break;
     case POPT_RMSOURCE: rba->buildAmount |= RPMBUILD_RMSOURCE; break;
@@ -162,6 +166,9 @@ static struct poptOption rpmBuildPoptTable[] = {
  { "bi", 0, POPT_ARGFLAG_ONEDASH, 0, POPT_BI,
 	N_("build through %install (%prep, %conf, %build, then install) from <specfile>"),
 	N_("<specfile>") },
+ { "bk", 0, POPT_ARGFLAG_ONEDASH, 0, POPT_BK,
+	N_("build through %check (%prep, %conf, %build, %install, then check) from <specfile>"),
+	N_("<specfile>") },
  { "bl", 0, POPT_ARGFLAG_ONEDASH, 0, POPT_BL,
 	N_("verify %files section from <specfile>"),
 	N_("<specfile>") },
@@ -193,6 +200,9 @@ static struct poptOption rpmBuildPoptTable[] = {
  { "ri", 0, POPT_ARGFLAG_ONEDASH, 0, POPT_RI,
 	N_("build through %install (%prep, %conf, %build, then install) from <source package>"),
 	N_("<source package>") },
+ { "rk", 0, POPT_ARGFLAG_ONEDASH, 0, POPT_RK,
+	N_("build through %check (%prep, %conf, %build, %install, then check) from <source package>"),
+	N_("<source package>") },
  { "rl", 0, POPT_ARGFLAG_ONEDASH, 0, POPT_RL,
 	N_("verify %files section from <source package>"),
 	N_("<source package>") },
@@ -223,6 +233,9 @@ static struct poptOption rpmBuildPoptTable[] = {
 	N_("<tarball>") },
  { "ti", 0, POPT_ARGFLAG_ONEDASH, 0, POPT_TI,
 	N_("build through %install (%prep, %conf, %build, then install) from <tarball>"),
+	N_("<tarball>") },
+ { "tk", 0, POPT_ARGFLAG_ONEDASH, 0, POPT_TK,
+	N_("build through %check (%prep, %conf, %build, %install, then check) from <tarball>"),
 	N_("<tarball>") },
  { "tl", 0, POPT_ARGFLAG_ONEDASH|POPT_ARGFLAG_DOC_HIDDEN, 0, POPT_TL,
 	N_("verify %files section from <tarball>"),
@@ -258,9 +271,6 @@ static struct poptOption rpmBuildPoptTable[] = {
 	N_("do not execute any stages of the build"), NULL },
  { "nodeps", '\0', POPT_ARG_VAL, &noDeps, 1,
 	N_("do not verify build dependencies"), NULL },
- { "nodirtokens", '\0', 0, 0, POPT_NODIRTOKENS,
-	N_("generate package header(s) compatible with (legacy) rpm v3 packaging"),
-	NULL},
 
  { "noclean", '\0', POPT_BIT_SET, &nobuildAmount, RPMBUILD_CLEAN|RPMBUILD_RMBUILD,
 	N_("do not execute %clean stage of the build"), NULL },
@@ -651,6 +661,11 @@ int main(int argc, char *argv[])
 	    break;
 	ba->buildAmount |= RPMBUILD_RMBUILD;
 	/* fallthrough */
+    case 'k':
+	ba->buildAmount |= RPMBUILD_CHECK;
+	if ((buildChar == 'k') && shortCircuit)
+	    break;
+	/* fallthrough */
     case 'i':
 	ba->buildAmount |= RPMBUILD_INSTALL;
 	ba->buildAmount |= RPMBUILD_CHECK;
@@ -664,13 +679,13 @@ int main(int argc, char *argv[])
 	/* fallthrough */
     case 'f':
 	ba->buildAmount |= RPMBUILD_CONF;
+	if ((buildChar == 'f') && shortCircuit)
+	    break;
 	ba->buildAmount |= RPMBUILD_BUILDREQUIRES;
 	if (!noDeps) {
 	    ba->buildAmount |= RPMBUILD_DUMPBUILDREQUIRES;
 	    ba->buildAmount |= RPMBUILD_CHECKBUILDREQUIRES;
 	}
-	if ((buildChar == 'f') && shortCircuit)
-	    break;
 	/* fallthrough */
     case 'p':
 	ba->buildAmount |= RPMBUILD_PREP;
@@ -711,7 +726,9 @@ int main(int argc, char *argv[])
 	    buildChar != 'f' &&
 	    buildChar != 'c' &&
 	    buildChar != 'i' &&
-	    buildChar != 'l') {
+	    buildChar != 'k' &&
+	    buildChar != 'l')
+	{
 	    ba->buildAmount |= RPMBUILD_RMSOURCE;
 	    ba->buildAmount |= RPMBUILD_RMSPEC;
 	    ba->buildAmount |= RPMBUILD_RMBUILD;

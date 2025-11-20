@@ -4,6 +4,7 @@
 
 #include "system.h"
 
+#include <map>
 #include <unordered_map>
 
 #include <rpm/rpmfileutil.h>	/* for rpmCleanPath */
@@ -18,13 +19,6 @@
 #include "misc.hh"
 #include "debug.h"
 #include <libgen.h>
-
-
-static unsigned int sidHash(rpmsid sid)
-{
-    return sid;
-}
-
 
 /**
  * Finger print cache entry.
@@ -58,41 +52,27 @@ struct fingerPrint {
 	    ((a).subDirId == (b).subDirId) \
     )
 
-/* Hash value for a finger print pointer, based on dev and inode only! */
-struct fpHash
-{
-    size_t operator() (const fingerPrint *fp) const
-    {
-	unsigned int hash = 0;
-	int j;
-
-	hash = sidHash(fp->baseNameId);
-	if (fp->subDirId) hash ^= sidHash(fp->subDirId);
-
-	hash ^= ((unsigned)fp->entry->dev);
-	for (j=0; j<4; j++) hash ^= ((fp->entry->ino >> (8*j)) & 0xFF) << ((3-j)*8);
-
-	return hash;
-    }
-};
-
-struct fpEqual
+struct fpLess
 {
     bool operator()(const fingerPrint * k1, const fingerPrint * k2) const
     {
-	/* If the addresses are the same, so are the values. */
+	/* An item cannot be less than itself */
 	if (k1 == k2)
-	    return true;
+	    return false;
 
-	/* Otherwise, compare fingerprints by value. */
-	if (FP_EQUAL(*k1, *k2))
-	    return true;
-	return false;
+	if (FP_ENTRY_EQUAL(k1->entry, k2->entry)) {
+	    if (k1->subDirId == k2->subDirId)
+		return k1->baseNameId < k2->baseNameId;
+	    return k1->subDirId < k2->subDirId;
+	}
+	if (k1->entry->dev == k2->entry->dev)
+	    return k1->entry->ino < k2->entry->ino;
+	return k1->entry->dev < k2->entry->dev;
     }
 };
 
 using rpmFpEntryHash = std::unordered_multimap<rpmsid,fprintCacheEntry_s>;
-using rpmFpHash = std::unordered_map<fingerPrint *,rpmffi_s,fpHash,fpEqual>;
+using rpmFpHash = std::multimap<fingerPrint *,rpmffi_s,fpLess>;
 
 /**
  * Finger print cache.
@@ -285,7 +265,7 @@ fingerPrint * fpLookupList(fingerPrintCache cache, rpmstrPool pool,
 		  const uint32_t * dirIndexes, 
 		  int fileCount)
 {
-    fingerPrint * fps = (fingerPrint *)xmalloc(fileCount * sizeof(*fps));
+    fingerPrint * fps = (fingerPrint *)xcalloc(fileCount, sizeof(*fps));
     int i;
 
     /*
@@ -403,13 +383,16 @@ fingerPrint * fpCacheGetByFp(fingerPrintCache cache,
 			     struct fingerPrint * fp, int ix,
 			     std::vector<struct rpmffi_s> & recs)
 {
-    auto range = cache->fp.equal_range(fp + ix);
-    if (range.first != range.second) {
-	for (auto it = range.first; it != range.second; ++it)
-	    recs.push_back(it->second);
-	return fp + ix;
-    } else
-	return NULL;
+    fingerPrint *fpe = fp + ix;
+    if (fpe->entry) {
+	auto range = cache->fp.equal_range(fpe);
+	if (range.first != range.second) {
+	    for (auto it = range.first; it != range.second; ++it)
+		recs.push_back(it->second);
+	    return fpe;
+	}
+    }
+    return NULL;
 }
 
 void fpCachePopulate(fingerPrintCache fpc, rpmts ts, int fileCount)
@@ -448,7 +431,9 @@ void fpCachePopulate(fingerPrintCache fpc, rpmts ts, int fileCount)
 		    continue;
 		ffi.p = p;
 		ffi.fileno = i;
-		symlinks.insert({fpList + i, ffi});
+		fingerPrint *fp = fpList + i;
+		if (fp->entry)
+		    symlinks.insert({fp, ffi});
 		havesymlinks = 1;
 	    }
 	}
@@ -486,8 +471,9 @@ void fpCachePopulate(fingerPrintCache fpc, rpmts ts, int fileCount)
 	    }
 	    ffi.p = p;
 	    ffi.fileno = i;
-	    fpc->fp.insert({fpList + i, ffi});
 	    lastfp = fpList + i;
+	    if (lastfp->entry)
+		fpc->fp.insert({lastfp, ffi});
 	}
 	(void) rpmswExit(rpmtsOp(ts, RPMTS_OP_FINGERPRINT), 0);
 	rpmfilesFree(fi);

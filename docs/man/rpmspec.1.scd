@@ -14,7 +14,7 @@ rpmspec - RPM Spec Tool
 *rpmspec* is a tool for querying a spec file. More specifically for
 querying hypothetical packages which would be created from the given
 spec file. So querying a spec file with *rpmspec* is similar to
-querying a package built from that spec file. But is is not identical.
+querying a package built from that spec file. But it is not identical.
 With *rpmspec* you can't query all fields which you can query from a
 built package. E. g. you can't query BUILDTIME with *rpmspec* for
 obvious reasons. You also cannot query other fields automatically
@@ -63,7 +63,7 @@ See *rpm-common*(8) for the options common to all operations.
 See *rpm-common*(8).
 
 # EXIT STATUS
-On success, 0 is returned, a non-zero failure code otherwise.
+On success, 0 is returned, a nonzero failure code otherwise.
 
 # EXAMPLES
 *rpmspec -q rpm.spec*

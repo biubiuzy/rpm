@@ -4,7 +4,7 @@ title: rpm.org - RPM Tags
 ---
 # RPM Tags
 
-The package's meta data in stored in the RPM header. The header is a binary data structure that stores the single pieces of data in tags. Each tag has a pre-defined meaning and data type. These are not stored in the header itselfs but need to be known by the code reading the header. In the header the tags are only refered by their number.
+The package's meta data in stored in the RPM header. The header is a binary data structure that stores the single pieces of data in tags. Each tag has a pre-defined meaning and data type. These are not stored in the header itself but need to be known by the code reading the header. In the header the tags are only referenced by their number.
 
 ## Tag types
 
@@ -21,7 +21,7 @@ Additionally there is a `char` datatype that is also only used once.
 
 There is a `bin` datatype for arbitrary data that is basically an `char` array.
 
-There are two string types: Plain `string` with is zero terminated and of arbitary length (within the header size restriction).
+There are two string types: Plain `string` with is zero terminated and of arbitrary length (within the header size restriction).
 
 `i18nstring`s are translated to the requested locale when queried.
 
@@ -93,8 +93,8 @@ Filedigestalgo    | 5011 | int32        | ID of file digest algorithm. If missin
 Longarchivesize   | 271  | int64        | (Uncompressed) payload size when > 4GB.
 Longsize          | 5009 | int64        | Installed package size when > 4GB.
 Mimedict          | 5116 | int32        | Dictionary of MIME types, only >= v6.
-Payloadcompressor | 1125 | string       | Payload compressor name (see `rpm-payloadflags`(7))
-Payloadflags      | 1126 | string       | Payload compressor level (see `rpm-payloadflags`(7))
+Payloadcompressor | 1125 | string       | Payload compressor name (see *rpm-payloadflags*(7))
+Payloadflags      | 1126 | string       | Payload compressor level (see *rpm-payloadflags*(7))
 Payloadformat     | 1124 | string       | Payload format (`cpio`)
 Prefixes          | 1098 | string array | Relocatable prefixes (on relocatable packages).
 Size              | 1009 | int32        | Installed package size.
@@ -104,7 +104,7 @@ Size              | 1009 | int32        | Installed package size.
 Tag Name        | Value| Type         | Description
 ----------------|------|--------------|------------
 Basenames       | 1117 | string array | basename(3) of the path.
-Dirindexes      | 1116 | int32 array  | Index into dirname(3) array of the pacakge (see Dirname tag).
+Dirindexes      | 1116 | int32 array  | Index into dirname(3) array of the package (see Dirname tag).
 Filedevices     | 1095 | int32 array  | Abstract device ID (hardlink calculation only).
 Filedigests     | 1035 | string array | File cryptographic digest (aka hash) using algorithm specified in  Filedigestalgo.
 Fileflags       | 1037 | int32 array  | File virtual attributes (doc, license, ghost, artifact etc)
@@ -312,6 +312,8 @@ Openpgp           | 278  | string array | OpenPGP signature(s) of the header, ba
 Payloadsha256     | 5092 | string array | SHA256 digest of the compressed payload.
 Payloadsha256algo | 5093 | int32        | ID of the SHA256 algorithm (obsolete)
 Payloadsha256alt  | 5097 | string array | SHA256 digest of the uncompressed payload.
+Payloadsha512     | 5121 | string       | SHA512 digest of the compressed payload.
+Payloadsha512alt  | 5122 | string       | SHA512 digest of the uncompressed payload.
 Payloadsha3_256   | 5123 | string       | SHA3-256 digest of the compressed payload.
 Payloadsha3_256alt| 5124 | string       | SHA3-256 digest of the uncompressed payload.
 Rsaheader         | 268  | bin          | OpenPGP RSA signature of the header (if thus signed).

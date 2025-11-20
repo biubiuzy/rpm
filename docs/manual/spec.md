@@ -56,7 +56,7 @@ Comments are also allowed after conditionals (see below). Some older
 versions of RPM (4.14 to 4.19) did issue a warning on those, but they
 are fully legal from RPM 4.20 onward.
 
-Macros are expanded even in comment lines. If this is undesireable, escape
+Macros are expanded even in comment lines. If this is undesirable, escape
 the macro with an extra percent sign (%):
 
 ```
@@ -133,8 +133,8 @@ macros (with parameters) but are not.
 Each section type has its own rules and syntax. Conditionals are
 evaluated first and then macros expanded. Only then are the sections
 parsed by the rules of the section types. The content of build and
-runtime scripts is then passed on the the interpreter - possible being
-stored in a header tag inbetween. The syntax of the other sections is
+runtime scripts is then passed on to the interpreter - possibly being
+stored in a header tag along the way. The syntax of the other sections is
 described below.
 
 ## Preamble
@@ -353,7 +353,7 @@ accepted qualifiers are:
 * `pretrans`
 
   Denotes the dependency must be present before the transaction starts,
-  and cannot be satisified by added packages in a transaction. As such,
+  and cannot be satisfied by added packages in a transaction. As such,
   it does not affect transaction ordering. A pretrans-dependency is
   free to be removed after the install-transaction completes.
 
@@ -464,7 +464,7 @@ you would add
 
 Package is not buildable on architectures listed here.
 Used when software is portable across most architectures except some,
-for example due to endianess issues.
+for example due to endianness issues.
 
 #### ExclusiveArch
 
@@ -575,7 +575,8 @@ to the corresponding main section, in the order they appear in the spec.
 If the main section does not exist, they are applied relative to the
 first fragment.
 
-During the execution of build scriptlets, (at least) the following
+The execution environment of the build scriptlets is set via the `rpmbuild.env`
+file in the per-package build directory. At least the following
 rpm-specific environment variables are set:
 
 Variable            | Description
@@ -605,7 +606,7 @@ in the script.
 ### %prep
 
 %prep prepares the sources for building. This is where sources are
-unpacked and possible patches applied, and other similar activies
+unpacked and possible patches applied, and other similar activities
 could be performed.
 
 Typically [%autosetup](autosetup.md) is used to automatically handle
@@ -690,7 +691,7 @@ used to install the build requires and restart the build.
 
 On success the found build dependencies are also added to the source
 package. As always they depend on the exact circumstance of the build
-and may be different when bulding based on other packages or even
+and may be different when building based on other packages or even
 another architecture.
 
 ### %conf (since rpm >= 4.18)
@@ -746,43 +747,8 @@ specific `%clean` section generally suggests flaws in the spec.
 
 ## Runtime scriptlets
 
-Runtime scriptlets are executed at the time of install and erase of the
-package. By default, scriptlets are executed with `/bin/sh` shell, but
-this can be overridden with `-p <path>` as an argument to the scriptlet
-for each scriptlet individually. Other supported operations include
-[scriptlet expansion](scriptlet_expansion.md).
-
-### Basic scriptlets
-
- * `%pre`
- * `%post`
- * `%preun`
- * `%postun`
- * `%pretrans`
- * `%posttrans`
- * `%preuntrans`
- * `%postuntrans`
- * `%verify`
-
-### Triggers
-
- * `%triggerprein`
- * `%triggerin`
- * `%triggerun`
- * `%triggerpostun`
-
-More information is available in [trigger chapter](triggers.md).
-
-### File triggers (since rpm >= 4.13)
-
- * `%filetriggerin`
- * `%filetriggerun`
- * `%filetriggerpostun`
- * `%transfiletriggerin`
- * `%transfiletriggerun`
- * `%transfiletriggerpostun`
-
-More information is available in [file trigger chapter](file_triggers.md).
+Runtime scriptlets are executed at various stages of a package's lifetime,
+such as install or erase. For more information, see *rpm-scriptlets*(7).
 
 ## %files section
 

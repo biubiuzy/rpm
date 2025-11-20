@@ -17,6 +17,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <glob.h>
 
 #include <rpm/rpmio.h>
 #include <rpm/rpmmacro.h>
@@ -38,6 +39,7 @@ int _rpmlua_have_forked = 0;
 
 struct rpmlua_s {
     lua_State *L;
+    std::stack<FILE *> out;
     std::stack<std::string> printbuf;
 };
 
@@ -112,6 +114,7 @@ rpmlua rpmluaNew()
 
     lua = new rpmlua_s {};
     lua->L = L;
+    lua->out.push(stdout);
 
     for (lib = extlibs; lib->name; lib++) {
 	luaL_requiref(L, lib->name, lib->func, 1);
@@ -169,6 +172,20 @@ void * rpmluaGetLua(rpmlua lua)
 {
     INITSTATE(lua);
     return lua->L;
+}
+
+void rpmluaPushOutstream(rpmlua lua, FILE *stream)
+{
+    INITSTATE(lua);
+    lua->out.push(stream);
+}
+
+void rpmluaPopOutstream(rpmlua lua)
+{
+    INITSTATE(lua);
+    /* Ensure stdout remains */
+    if (lua->out.size() > 1)
+	lua->out.pop();
 }
 
 void rpmluaPushPrintBuffer(rpmlua lua)
@@ -744,13 +761,13 @@ static int rpm_print (lua_State *L)
 	    buf += s;
 	} else {
 	    if (i > 1)
-		(void) fputs("\t", stdout);
-	    (void) fputs(s, stdout);
+		(void) fputs("\t", lua->out.top());
+	    (void) fputs(s, lua->out.top());
 	}
 	lua_pop(L, 1);  /* pop result */
     }
     if (lua->printbuf.empty()) {
-	(void) fputs("\n", stdout);
+	(void) fputs("\n", lua->out.top());
     }
     return 0;
 }
@@ -937,19 +954,21 @@ static int rpm_glob(lua_State *L)
     const char *pat = luaL_checkstring(L, 1);
     rpmglobFlags flags = RPMGLOB_NONE;
     int argc = 0;
+    int rc = 0;
     ARGV_t argv = NULL;
 
-    if (luaL_optstring(L, 2, "c"))
+    if (strchr(luaL_optstring(L, 2, ""), 'c'))
 	flags |= RPMGLOB_NOCHECK;
 
-    if (rpmGlobPath(pat, flags, &argc, &argv) == 0) {
+    rc = rpmGlobPath(pat, flags, &argc, &argv);
+    if (rc == 0) {
 	lua_createtable(L, 0, argc);
 	for (int i = 0; i < argc; i++) {
 	    lua_pushstring(L, argv[i]);
 	    lua_rawseti(L, -2, i + 1);
 	}
 	argvFree(argv);
-    } else {
+    } else if (rc != GLOB_NOMATCH) {
 	luaL_error(L, "glob %s failed: %s", pat, strerror(errno));
     }
 

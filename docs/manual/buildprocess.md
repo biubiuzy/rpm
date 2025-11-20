@@ -11,6 +11,7 @@ title: rpm.org - Package Build Process
   * If  buildarch detected parse spec multiple times - once for each arch with `_target_cpu` macro set
   * Build will iterate over all the spec variants and build multiple versions
 * Execute internal `%mkbuilddir` script to create `%builddir`
+* Export the build environment to `%builddir/rpmbuild.env` file
 * Check static build requires
 * Execute present [build scriptlets](spec.md#build-scriptlets)
   * `%prep`
@@ -92,10 +93,10 @@ Macro name                                      | Description
 `%_wrong_version_format_terminate_build`        | Invalid version format in dependencies terminates build
 `%_missing_build_ids_terminate_build`           | ELF files without BuildIDs terminates builds (if debuginfo creation enabled)
 `%_nonzero_exit_pkgcheck_terminate_build`       | Package check program failing terminates build
-`%_build_pkgcheck`                              | Progam to run on each generated binary package
+`%_build_pkgcheck`                              | Program to run on each generated binary package
 `%_build_pkcheck_set`                           | Program to run on the generated binary package set
 
-### Reproducability
+### Reproducibility
 
 Macro name                            | Description
 --------------------------------------|-----------

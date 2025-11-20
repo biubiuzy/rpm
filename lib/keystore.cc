@@ -59,12 +59,14 @@ static rpmRC load_keys_from_glob(rpmtxn txn, rpmKeyring keyring, string glob)
 	rpmPubkey key = rpmPubkeyRead(*f);
 
 	if (!key) {
-	    rpmlog(RPMLOG_ERR, _("%s: reading of public key failed.\n"), *f);
+	    rpmlog(RPMLOG_WARNING, _("Could not read key %s\n"), *f);
 	    continue;
 	}
 
 	if (rpmKeyringAddKey(keyring, key) == 0) {
 	    rpmlog(RPMLOG_DEBUG, "Loaded key %s\n", *f);
+	} else {
+	    rpmlog(RPMLOG_WARNING, _("Could not load key %s\n"), *f);
 	}
 	rpmPubkeyFree(key);
     }
@@ -113,7 +115,6 @@ exit:
     return rc;
 }
 
-
 static rpmRC delete_file_store(std::string path)
 {
     try {
@@ -124,6 +125,19 @@ static rpmRC delete_file_store(std::string path)
     return RPMRC_OK;
 }
 
+/* Wrapper for private delete_key() methods that falls back to short keyid */
+static rpmRC rpm::delete_key_compat(auto keystore, rpmtxn txn, rpmPubkey key, auto skip)
+{
+    rpmRC rc = RPMRC_NOTFOUND;
+    string fp = rpmPubkeyFingerprintAsHex(key);
+
+    if (keystore->delete_key(txn, fp, skip) == RPMRC_NOTFOUND) {
+	/* make sure an old, short keyid version gets removed */
+	keystore->delete_key(txn, fp.substr(32), skip);
+    }
+
+    return rc;
+}
 
 /*****************************************************************************/
 
@@ -153,7 +167,7 @@ rpmRC keystore_fs::delete_key(rpmtxn txn, const string & keyid, const string & n
 
 rpmRC keystore_fs::delete_key(rpmtxn txn, rpmPubkey key)
 {
-    return delete_key(txn, rpmPubkeyFingerprintAsHex(key));
+    return delete_key_compat(this, txn, key, "");
 }
 
 rpmRC keystore_fs::import_key(rpmtxn txn, rpmPubkey key, int replace, rpmFlags flags)
@@ -168,10 +182,7 @@ rpmRC keystore_fs::import_key(rpmtxn txn, rpmPubkey key, int replace, rpmFlags f
 
     if (!rc && replace) {
 	/* find and delete the old pubkey entry */
-	if (delete_key(txn, fp, keyfmt) == RPMRC_NOTFOUND) {
-	    /* make sure an old, short keyid version gets removed */
-	    delete_key(txn, fp.substr(32), keyfmt);
-	}
+	delete_key_compat(this, txn, key, keyfmt);
     }
 
     free(dir);
@@ -301,20 +312,24 @@ rpmRC keystore_rpmdb::load_keys(rpmtxn txn, rpmKeyring keyring)
 	}
 
 	while ((key = rpmtdNextString(&pubkeys))) {
+	    int rc = 1;
 	    uint8_t *pkt;
 	    size_t pktlen;
 
-	    if (rpmBase64Decode(key, (void **) &pkt, &pktlen) == 0) {
+	    if ((rc = rpmBase64Decode(key, (void **) &pkt, &pktlen)) == 0) {
 		rpmPubkey key = rpmPubkeyNew(pkt, pktlen);
 
 		if (key) {
-		    if (rpmKeyringAddKey(keyring, key) == 0) {
+		    if ((rc = rpmKeyringAddKey(keyring, key)) == 0) {
 			rpmlog(RPMLOG_DEBUG, "Loaded key %s\n", nevr);
 		    }
 		    rpmPubkeyFree(key);
 		}
 		free(pkt);
 	    }
+
+	    if (rc)
+		rpmlog(RPMLOG_WARNING, _("Could not load key %s\n"), nevr);
 	}
 	free(nevr);
 	rpmtdFreeData(&pubkeys);
@@ -350,7 +365,7 @@ rpmRC keystore_rpmdb::delete_key(rpmtxn txn, const string & keyid, unsigned int 
 
 rpmRC keystore_rpmdb::delete_key(rpmtxn txn, rpmPubkey key)
 {
-    return delete_key(txn, rpmPubkeyFingerprintAsHex(key));
+    return delete_key_compat(this, txn, key, 0);
 }
 
 rpmRC keystore_rpmdb::delete_store(rpmtxn txn)
@@ -392,12 +407,7 @@ rpmRC keystore_rpmdb::import_key(rpmtxn txn, rpmPubkey key, int replace, rpmFlag
     if (!rc && replace) {
 	/* find and delete the old pubkey entry */
 	unsigned int newinstance = headerGetInstance(h);
-	char *keyid = headerFormat(h, "%{version}", NULL);
-	if (delete_key(txn, keyid, newinstance) == RPMRC_NOTFOUND) {
-	    /* make sure an old, short keyid version gets removed */
-	    delete_key(txn, keyid+32, newinstance);
-	}
-	free(keyid);
+	delete_key_compat(this, txn, key, newinstance);
     }
     headerFree(h);
 

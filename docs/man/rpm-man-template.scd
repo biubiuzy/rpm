@@ -9,11 +9,14 @@ Use the generic form for one-purpose commands:
 *rpmcmd* [options] [_ARGUMENT_] ...
 
 Use one entry per operation for multi-operation (aka mode) commands.
-Use {} for the operation switches:
+Use {} for the operation switches, or <operation> if the operations
+all share similar options and arguments.
 
 *rpmcmd* {*-b*|*--bardize*} [options] [bardize-options] [_ARGUMENT_] ...
 
 *rpmcmd* {*-f*|*--frobnize*} [options] [_ARGUMENT_] ...
+
+*rpmcmd* <operation> [options] [_ARGUMENT_] ...
 
 # DESCRIPTION
 Describe what *rpmcmd* command does in plain, understandable
@@ -44,6 +47,7 @@ Typographic conventions:
 - Use "Added: X.Y.Z." to indicate the version where a feature was added.
   Either in parentheses at the end of a line (inline variant) or on a
   line of it's own, surrounded by empty lines (standalone variant).
+  Only use this for versions 4.11.0 and newer.
 
 When in doubt, consult *man-pages*(7).
 
@@ -145,6 +149,10 @@ On success, 0 is returned, a non-zero failure code otherwise.
 Add at least one example for each major functionality of the command.
 Command first in bold, then description, similar to option descriptions.
 If command output is included in the description, use indented literal block.
+Use second level, numbered sections to separate longer examples from each other,
+or to group related ones together.
+
+## Example 1. Basic commands
 
 *rpmcmd --do-this package-1.0-1.noarch.rpm*
 	Do this thing to _package-1.0-1.noarch.rpm_.

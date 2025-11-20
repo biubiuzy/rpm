@@ -19,7 +19,7 @@ _FILE_
 *rpmsort* has no options.
 
 # EXIT STATUS
-On success, 0 is returned, a non-zero failure code otherwise.
+On success, 0 is returned, a nonzero failure code otherwise.
 
 # EXAMPLES
 *echo -e 'rpm-4.18.0-3.fc38.x86_64\\nrpm-4.18.0-1.fc38.x86_64' | rpmsort*
@@ -27,3 +27,6 @@ On success, 0 is returned, a non-zero failure code otherwise.
 	rpm-4.18.0-1.fc38.x86_64
 	rpm-4.18.0-3.fc38.x86_64
 	```
+
+# SEE ALSO
+*rpm-version*(7)

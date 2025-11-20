@@ -81,7 +81,7 @@ opposed to just package building) parts:
 	*all* means install all locale specific files.
 
 *%\_install_script_path* _PATH_
-	The PATH put into the environment before running %pre/%post et al.
+	The PATH used in *rpm-scriptlet*(7) execution environment.
 
 *%\_keyring* _BACKEND_
 	The keyring type to use. Possible values for _BACKEND_ are:
@@ -102,7 +102,7 @@ opposed to just package building) parts:
 
 *%\_netsharedpath* _PATH_
 	A colon separated list of paths where files should *not* be installed.
-	Usually, these are network file system mount points.
+	Usually, these are network filesystem mount points.
 
 *%\_passwd_path* _PATH_
 	Location of passwd(5) files as : separated list
@@ -111,7 +111,7 @@ opposed to just package building) parts:
 	A colon separated list of hash algorithms to calculate digests on the
 	entire package files during verification. The calculated digests
 	are stored in the *Packagedigests* tag of packages in the rpmdb,
-	and the corresponding algorithms in in the *Packagedigestalgos* tag.
+	and the corresponding algorithms in the *Packagedigestalgos* tag.
 	No package digests are calculated or stored if *--noverify* is
 	used during package installation.
 

@@ -20,30 +20,34 @@ public:
 
 class keystore_fs : public keystore {
 public:
-    virtual rpmRC load_keys(rpmtxn txn, rpmKeyring keyring);
-    virtual rpmRC import_key(rpmtxn txn, rpmPubkey key, int replace = 1, rpmFlags flags = 0);
-    virtual rpmRC delete_key(rpmtxn txn, rpmPubkey key);
-    virtual rpmRC delete_store(rpmtxn txn);
+    rpmRC load_keys(rpmtxn txn, rpmKeyring keyring) override;
+    rpmRC import_key(rpmtxn txn, rpmPubkey key, int replace = 1, rpmFlags flags = 0) override;
+    rpmRC delete_key(rpmtxn txn, rpmPubkey key) override;
+    rpmRC delete_store(rpmtxn txn) override;
 private:
-    rpmRC delete_key(rpmtxn txn, const std::string & keyid, const std::string & newname = "");
+    rpmRC delete_key(rpmtxn txn, const std::string & keyid, const std::string & newname);
+
+    friend rpmRC delete_key_compat(auto keystore, rpmtxn txn, rpmPubkey key, auto skip);
 };
 
 class keystore_rpmdb : public keystore {
 public:
-    virtual rpmRC load_keys(rpmtxn txn, rpmKeyring keyring);
-    virtual rpmRC import_key(rpmtxn txn, rpmPubkey key, int replace = 1, rpmFlags flags = 0);
-    virtual rpmRC delete_key(rpmtxn txn, rpmPubkey key);
-    virtual rpmRC delete_store(rpmtxn txn);
+    rpmRC load_keys(rpmtxn txn, rpmKeyring keyring) override;
+    rpmRC import_key(rpmtxn txn, rpmPubkey key, int replace = 1, rpmFlags flags = 0) override;
+    rpmRC delete_key(rpmtxn txn, rpmPubkey key) override;
+    rpmRC delete_store(rpmtxn txn) override;
 private:
-    rpmRC delete_key(rpmtxn txn, const std::string & keyid, unsigned int newinstance = 0);
+    rpmRC delete_key(rpmtxn txn, const std::string & keyid, unsigned int newinstance);
+
+    friend rpmRC delete_key_compat(auto keystore, rpmtxn txn, rpmPubkey key, auto skip);
 };
 
 class keystore_openpgp_cert_d : public keystore {
 public:
-    virtual rpmRC load_keys(rpmtxn txn, rpmKeyring keyring);
-    virtual rpmRC import_key(rpmtxn txn, rpmPubkey key, int replace = 1, rpmFlags flags = 0);
-    virtual rpmRC delete_key(rpmtxn txn, rpmPubkey key);
-    virtual rpmRC delete_store(rpmtxn txn);
+    rpmRC load_keys(rpmtxn txn, rpmKeyring keyring) override;
+    rpmRC import_key(rpmtxn txn, rpmPubkey key, int replace = 1, rpmFlags flags = 0) override;
+    rpmRC delete_key(rpmtxn txn, rpmPubkey key) override;
+    rpmRC delete_store(rpmtxn txn) override;
 };
 
 RPM_GNUC_INTERNAL

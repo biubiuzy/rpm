@@ -46,7 +46,7 @@ for _, v in ipairs(v) do
 end
 ```
 
-All macros share the the same global Lua execution environment.
+All macros share the same global Lua execution environment.
 
 ## Calling parametric macros
 Parametric macros (including all built-in macros) can be called in a Lua
@@ -71,7 +71,7 @@ macros.dostuff({'one', 'two', 'three'})
 
 ## Returning data
 By definition, anything *print()*'ed in Lua will end up in the macro
-expansion. Lua macros can also also *return* their output, which makes
+expansion. Lua macros can also *return* their output, which makes
 programming helper macros look more natural.
 
 Example:
@@ -168,6 +168,11 @@ Added: 4.18.0
 While scriptlets shouldn't be allowed to fail normally, you can signal
 scriptlet failure status by using Lua's *error(*_msg_, [_level_]*)*
 function if you need to.
+
+## File triggers
+Other file triggers receive the triggering paths via standard input, but
+Lua scriplets need to call the *rpm.next_line()* function in a loop. This
+function only exists inside the file trigger running environment.
 
 # SPEC FILES
 In the context of a *rpm-spec*(5) file parse with *rpmbuild*(1) or
@@ -301,7 +306,7 @@ The following RPM specific functions are available:
 	Open a file stream using RPM IO facilities, with support for
 	transparent compression and decompression.
 
-	_path_ is file name string, optionally followed with _mode_ string to
+	_path_ is filename string, optionally followed with _mode_ string to
 	specify open behavior:
 	- *a*: open for append
 	- *w*: open for writing, truncate
@@ -454,6 +459,7 @@ The following RPM specific functions are available:
 *vercmp(*_v1_, _v2_*)*
 	Perform RPM version comparison on argument strings.
 	Returns -1, 0 or 1 if _v1_ is smaller, equal or larger than _v2_.
+	See *rpm-version*(7).
 
 	Note: in RPM < 4.16 this operated on version segments only, which
 	does not produce correct results on full _EVR_ strings.
@@ -522,7 +528,7 @@ calls refer to the system manual, eg *access*(3) for *posix.access()*.
 
 *chmod(*_path_, _mode_*)*
 	Change file/directory mode. Mode can be either an octal number as for
-	*chmod*(2) system call, or a string presenation similar to *chmod*(1).
+	*chmod*(2) system call, or a string presentation similar to *chmod*(1).
 
 	Example:
 	```
@@ -612,7 +618,7 @@ calls refer to the system manual, eg *access*(3) for *posix.access()*.
 	```
 
 *getcwd()*
-	Get current directory. See *getenv*(3).
+	Get current directory. See *getcwd*(3).
 
 	Example:
 	```
@@ -653,7 +659,7 @@ calls refer to the system manual, eg *access*(3) for *posix.access()*.
 
 *getpasswd*([_user_ [, _selector_]]*)*
 	Get *passwd*(5) information for a user account. _user_ may be either a
-	numeric id or user name. If omitted, current user is used.
+	numeric id or username. If omitted, current user is used.
 	The optional _selector_ argument may be one of:
 	- *name*
 	- *uid*
@@ -678,7 +684,7 @@ calls refer to the system manual, eg *access*(3) for *posix.access()*.
 	- *gid*: group id
 	- *uid*: user id
 	- *pgrp*: parent group id
-	- *pid*: parent user id
+	- *pid*: process id
 	- *ppid*: parent pid
 
 	If omitted, a table with all these fields is returned.
@@ -780,7 +786,7 @@ calls refer to the system manual, eg *access*(3) for *posix.access()*.
 
 *setuid(*_user_*)*
 	Set user identity. _user_ may be specified either as a numeric id or
-	user name. See also *setuid*(2).
+	username. See also *setuid*(2).
 
 	Note: This is a privileged operation.
 
@@ -972,6 +978,6 @@ primarily searched from *%{getconfdir}/lua/*. *%\_rpmluadir* is a shorthand
 for this path.
 
 # SEE ALSO
-*rpm-macros*(7) *rpm-payloadflags*(7) *rpmlua*(1)
+*rpm-macros*(7) *rpm-payloadflags*(7) *rpmlua*(1) *rpm-version*(7)
 
 *https://www.lua.org/*

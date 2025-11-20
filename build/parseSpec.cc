@@ -127,7 +127,7 @@ static int matchTok(const char *token, const char *line)
 	SKIPNONSPACE(be);
 	if (be == b)
 	    break;
-	if (toklen != (be-b) || rstrncasecmp(token, b, (be-b)))
+	if (toklen != ptrlen(b,be) || rstrncasecmp(token, b, (be-b)))
 	    continue;
 	rc = 1;
 	break;
@@ -1007,7 +1007,7 @@ static rpmRC parseBuildsysSect(rpmSpec spec, const char *prefix,
 				       "%", mn, " ",
 				       args ? args : "",
 				       "\n", NULL);
-	    size_t blen = strlen(buf);
+	    ssize_t blen = strlen(buf);
 	    if (Fwrite(buf, blen, 1, fd) < blen) {
 		rc = RPMRC_FAIL;
 		rpmlog(RPMLOG_ERR,

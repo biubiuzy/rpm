@@ -137,6 +137,7 @@ static inline int parseYesNo(const char * s)
 static struct Source *newSource(uint32_t num, const char *path, int flags)
 {
     struct Source *p = new Source {};
+    p->next = NULL;
     p->num = num;
     p->fullSource = xstrdup(path);
     p->flags = flags;
@@ -320,10 +321,16 @@ int addSource(rpmSpec spec, int specline, const char *srcname, rpmTagVal tag)
 	return RPMRC_FAIL;
     }
 
-    /* Create the entry and link it in */
+    /* Create the entry and link it at the end */
     p = newSource(num, srcname, flag);
-    p->next = spec->sources;
-    spec->sources = p;
+    if (!spec->sources) {
+	spec->sources = p;
+    } else {
+	Source * s = spec->sources;
+	while (s->next)
+	    s = s->next;
+	s->next = p;
+    }
     spec->numSources++;
 
     rasprintf(&buf, "%s%d",
@@ -389,8 +396,11 @@ static int parseBits(const char * s, const tokenBits tokbits,
 	    }
 	    for (tb = tokbits; tb->name; tb++) {
 		if (tb->name != NULL &&
-		    strlen(tb->name) == (se-s) && rstreqn(tb->name, s, (se-s)))
+		    strlen(tb->name) == ptrlen(s,se) &&
+		    rstreqn(tb->name, s, (se-s)))
+		{
 		    break;
+		}
 	    }
 	    if (tb->name == NULL) {
 		rc = RPMRC_FAIL;
@@ -612,7 +622,7 @@ static rpmRC addIcon(Package pkg, const char * file)
     FD_t fd = NULL;
     rpmRC rc = RPMRC_FAIL; /* assume failure */
     off_t size;
-    size_t nb, iconsize;
+    ssize_t nb, iconsize;
 
     p->next = pkg->icon;
     pkg->icon = p;

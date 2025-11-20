@@ -3,6 +3,8 @@
  */
 #include "system.h"
 #include <atomic>
+#include <string>
+#include <vector>
 
 #include <rpm/rpmtypes.h>
 #include <rpm/rpmlib.h>		/* rpmvercmp */
@@ -15,23 +17,26 @@
 
 #include "debug.h"
 
+using std::vector;
+using std::string;
+
 /**
  * A package dependency set.
  */
 struct rpmds_s {
     rpmstrPool pool;		/*!< String pool. */
     const char * Type;		/*!< Tag name. */
-    char * DNEVR;		/*!< Formatted dependency string. */
-    rpmsid * N;			/*!< Dependency name id's (pool) */
-    rpmsid * EVR;		/*!< Dependency EVR id's (pool) */
-    rpmsenseFlags * Flags;	/*!< Bit(s) identifying context/comparison. */
-    rpm_color_t * Color;	/*!< Bit(s) calculated from file color(s). */
+    string DNEVR;		/*!< Formatted dependency string. */
+    vector<rpmsid> N;		/*!< Dependency name id's (pool) */
+    vector<rpmsid> EVR;		/*!< Dependency EVR id's (pool) */
+    vector<rpmsenseFlags> Flags;/*!< Bit(s) identifying context/comparison. */
+    vector<rpm_color_t> Color;	/*!< Bit(s) calculated from file color(s). */
     rpmTagVal tagN;		/*!< Header tag. */
     int32_t Count;		/*!< No. of elements */
     unsigned int instance;	/*!< From rpmdb instance? */
     int i;			/*!< Element index. */
     std::atomic_int nrefs;	/*!< Reference count. */
-    int *ti;			/*!< Trigger index. */
+    vector<int> ti;		/*!< Trigger index. */
 };
 
 struct depinfo_s {
@@ -146,13 +151,13 @@ static char tagNToChar(rpmTagVal tagN)
 rpmTagVal rpmdsDToTagN(char deptype)
 {
     const struct depinfo_s *di = depinfoByAbrev(deptype);
-    return (di != NULL) ? di->typeTag : RPMTAG_NOT_FOUND;
+    return (di != NULL) ? di->typeTag : 0;
 }
 
 rpmsid rpmdsNIdIndex(rpmds ds, int i)
 {
     rpmsid id = 0;
-    if (ds != NULL && i >= 0 && i < ds->Count && ds->N != NULL)
+    if (ds != NULL && i >= 0 && i < ds->N.size())
 	id = ds->N[i];
     return id;
 }
@@ -160,14 +165,14 @@ rpmsid rpmdsNIdIndex(rpmds ds, int i)
 rpmsid rpmdsEVRIdIndex(rpmds ds, int i)
 {
     rpmsid id = 0;
-    if (ds != NULL && i >= 0 && i < ds->Count && ds->EVR != NULL)
+    if (ds != NULL && i >= 0 && i < ds->EVR.size())
 	id = ds->EVR[i];
     return id;
 }
 const char * rpmdsNIndex(rpmds ds, int i)
 {
     const char * N = NULL;
-    if (ds != NULL && i >= 0 && i < ds->Count && ds->N != NULL)
+    if (ds != NULL && i >= 0 && i < ds->N.size())
 	N = rpmstrPoolStr(ds->pool, ds->N[i]);
     return N;
 }
@@ -175,7 +180,7 @@ const char * rpmdsNIndex(rpmds ds, int i)
 const char * rpmdsEVRIndex(rpmds ds, int i)
 {
     const char * EVR = NULL;
-    if (ds != NULL && i >= 0 && i < ds->Count && ds->EVR != NULL)
+    if (ds != NULL && i >= 0 && i < ds->EVR.size())
 	EVR = rpmstrPoolStr(ds->pool, ds->EVR[i]);
     return EVR;
 }
@@ -183,7 +188,7 @@ const char * rpmdsEVRIndex(rpmds ds, int i)
 rpmsenseFlags rpmdsFlagsIndex(rpmds ds, int i)
 {
     rpmsenseFlags Flags = 0;
-    if (ds != NULL && i >= 0 && i < ds->Count && ds->Flags != NULL)
+    if (ds != NULL && i >= 0 && i < ds->Flags.size())
 	Flags = ds->Flags[i];
     return Flags;
 }
@@ -191,7 +196,7 @@ rpmsenseFlags rpmdsFlagsIndex(rpmds ds, int i)
 int rpmdsTiIndex(rpmds ds, int i)
 {
     int ti = -1;
-    if (ds != NULL && i >= 0 && i < ds->Count && ds->ti != NULL)
+    if (ds != NULL && i >= 0 && i < ds->ti.size())
 	ti = ds->ti[i];
     return ti;
 }
@@ -199,7 +204,7 @@ int rpmdsTiIndex(rpmds ds, int i)
 rpm_color_t rpmdsColorIndex(rpmds ds, int i)
 {
     rpm_color_t Color = 0;
-    if (ds != NULL && i >= 0 && i < ds->Count && ds->Color != NULL)
+    if (ds != NULL && i >= 0 && i < ds->Color.size())
 	Color = ds->Color[i];
     return Color;
 }
@@ -221,16 +226,7 @@ rpmds rpmdsFree(rpmds ds)
     if (dsType(ds->tagN, NULL, &tagEVR, &tagF, &tagTi))
 	return NULL;
 
-    if (ds->Count > 0) {
-	ds->N = _free(ds->N);
-	ds->EVR = _free(ds->EVR);
-	ds->Flags = _free(ds->Flags);
-	ds->ti = _free(ds->ti);
-    }
-
     ds->pool = rpmstrPoolFree(ds->pool);
-    ds->DNEVR = _free(ds->DNEVR);
-    ds->Color = _free(ds->Color);
 
     delete ds;
     return NULL;
@@ -252,6 +248,14 @@ static rpmds rpmdsCreate(rpmstrPool pool,
     return rpmdsLink(ds);
 }
 
+static void td2pool(rpmtd td, rpmstrPool pool, vector<rpmsid> & sids)
+{
+    sids.resize(td->count);
+    const char **strings = (const char **)td->data;
+    for (rpm_count_t i = 0; i < td->count; i++)
+	sids[i] = rpmstrPoolId(pool, strings[i], 1);
+}
+
 rpmds rpmdsNewPool(rpmstrPool pool, Header h, rpmTagVal tagN, int flags)
 {
     rpmTagVal tagEVR, tagF, tagTi;
@@ -264,38 +268,42 @@ rpmds rpmdsNewPool(rpmstrPool pool, Header h, rpmTagVal tagN, int flags)
     if (headerGet(h, tagN, &names, HEADERGET_MINMEM)) {
 	struct rpmtd_s evr, dflags, tindices;
 	rpm_count_t count = rpmtdCount(&names);
+	bool err = false;
 
 	headerGet(h, tagEVR, &evr, HEADERGET_MINMEM);
-	if (evr.count && evr.count != count) {
-	    rpmtdFreeData(&evr);
-	    return NULL;
-	}
+	headerGet(h, tagF, &dflags, HEADERGET_MINMEM);
+	if (evr.count != count || dflags.count != count)
+	    err = true;
 
-	headerGet(h, tagF, &dflags, HEADERGET_ALLOC);
-	if (dflags.count && dflags.count != count) {
-	    rpmtdFreeData(&dflags);
-	    return NULL;
-	}
-
-	if (tagTi != RPMTAG_NOT_FOUND) {
-	    headerGet(h, tagTi, &tindices, HEADERGET_ALLOC);
-	    if (tindices.count && tindices.count != count) {
+	if (tagTi) {
+	    headerGet(h, tagTi, &tindices, HEADERGET_MINMEM);
+	    if (tindices.count != count) {
 		rpmtdFreeData(&tindices);
-		return NULL;
+		err = true;
 	    }
+	}
+
+	if (err) {
+	    rpmtdFreeData(&names);
+	    rpmtdFreeData(&evr);
+	    rpmtdFreeData(&dflags);
+	    goto exit;
 	}
 
 	ds = rpmdsCreate(pool, tagN, Type, count, headerGetInstance(h));
 
-	ds->N = names.count ? rpmtdToPool(&names, ds->pool) : NULL;
-	ds->EVR = evr.count ? rpmtdToPool(&evr, ds->pool): NULL;
-	ds->Flags = (uint32_t *)dflags.data;
-	if (tagTi != RPMTAG_NOT_FOUND) {
-	    ds->ti = (int *)tindices.data;
+	td2pool(&names, ds->pool, ds->N);
+	td2pool(&evr, ds->pool, ds->EVR);
+	uint32_t *flagp = (uint32_t *)dflags.data;
+	ds->Flags.assign(flagp, flagp+dflags.count);
+	if (tagTi) {
+	    uint32_t *indices = (uint32_t *)tindices.data;
+	    ds->ti.assign(indices, indices+tindices.count);
+	    rpmtdFreeData(&tindices);
 	}
 
 	/* ensure rpmlib() requires always have RPMSENSE_RPMLIB flag set */
-	if (tagN == RPMTAG_REQUIRENAME && ds->Flags) {
+	if (tagN == RPMTAG_REQUIRENAME && ds->Flags.empty() == false) {
 	    for (int i = 0; i < ds->Count; i++) {
 		if (!(rpmdsFlagsIndex(ds, i) & RPMSENSE_RPMLIB)) {
 		    const char *N = rpmdsNIndex(ds, i);
@@ -321,51 +329,36 @@ rpmds rpmdsNew(Header h, rpmTagVal tagN, int flags)
     return rpmdsNewPool(NULL, h, tagN, flags);
 }
 
-char * rpmdsNewDNEVR(const char * dspfx, const rpmds ds)
+static string rpmdsNewDNEVRStr(const char * dspfx, const rpmds ds)
 {
     const char * N = rpmdsN(ds);
     const char * EVR = rpmdsEVR(ds);
     rpmsenseFlags Flags = rpmdsFlags(ds);
-    char * tbuf, * t;
-    size_t nb;
+    string s;
 
-    nb = 0;
-    if (dspfx)	nb += strlen(dspfx) + 1;
-    if (N)	nb += strlen(N);
-    /* XXX rpm prior to 3.0.2 did not always supply EVR and Flags. */
-    if (Flags & RPMSENSE_SENSEMASK) {
-	if (nb)	nb++;
-	if (Flags & RPMSENSE_LESS)	nb++;
-	if (Flags & RPMSENSE_GREATER) nb++;
-	if (Flags & RPMSENSE_EQUAL)	nb++;
-    }
-    /* XXX rpm prior to 3.0.2 did not always supply EVR and Flags. */
-    if (EVR && *EVR) {
-	if (nb)	nb++;
-	nb += strlen(EVR);
-    }
-
-    t = tbuf = (char *)xmalloc(nb + 1);
     if (dspfx) {
-	t = stpcpy(t, dspfx);
-	*t++ = ' ';
+	s += dspfx;
+	s += ' ';
     }
     if (N)
-	t = stpcpy(t, N);
-    /* XXX rpm prior to 3.0.2 did not always supply EVR and Flags. */
+	s += N;
     if (Flags & RPMSENSE_SENSEMASK) {
-	if (t != tbuf)	*t++ = ' ';
-	if (Flags & RPMSENSE_LESS)	*t++ = '<';
-	if (Flags & RPMSENSE_GREATER) *t++ = '>';
-	if (Flags & RPMSENSE_EQUAL)	*t++ = '=';
+	if (!s.empty()) s += ' ';
+	if (Flags & RPMSENSE_LESS)	s += '<';
+	if (Flags & RPMSENSE_GREATER)	s += '>';
+	if (Flags & RPMSENSE_EQUAL)	s += '=';
     }
-    /* XXX rpm prior to 3.0.2 did not always supply EVR and Flags. */
     if (EVR && *EVR) {
-	if (t != tbuf)	*t++ = ' ';
-	t = stpcpy(t, EVR);
+	if (!s.empty())	s += ' ';
+	s += EVR;
     }
-    *t = '\0';
-    return tbuf;
+    return s;
+}
+
+char * rpmdsNewDNEVR(const char * dspfx, const rpmds ds)
+{
+    string DNEVR = rpmdsNewDNEVRStr(dspfx, ds);
+    return xstrdup(DNEVR.c_str());
 }
 
 static rpmds singleDSPool(rpmstrPool pool, rpmTagVal tagN,
@@ -382,16 +375,11 @@ static rpmds singleDSPool(rpmstrPool pool, rpmTagVal tagN,
 
     ds = rpmdsCreate(pool, tagN, Type, 1, instance);
 
-    ds->N = (rpmsid *)xmalloc(1 * sizeof(*ds->N));
-    ds->N[0] = N;
-    ds->EVR = (rpmsid *)xmalloc(1 * sizeof(*ds->EVR));
-    ds->EVR[0] = EVR;
-    ds->Flags = (uint32_t *)xmalloc(sizeof(*ds->Flags));
-    ds->Flags[0] = Flags;
-    if (tagTi != RPMTAG_NOT_FOUND) {
-	ds->ti = (int *)xmalloc(sizeof(*ds->ti));
-	ds->ti[0] = triggerIndex;
-    }
+    ds->N.assign(1, N);
+    ds->EVR.assign(1, EVR);
+    ds->Flags.assign(1, Flags);
+    if (tagTi && triggerIndex != -1)
+	ds->ti.assign(1, triggerIndex);
     ds->i = 0;
     if (Color)
 	rpmdsSetColor(ds, Color);
@@ -456,7 +444,7 @@ rpmds rpmdsCurrent(rpmds ds)
     rpmds cds = NULL;
     int ti = -1;
     if (ds != NULL && ds->i >= 0 && ds->i < ds->Count) {
-	if (ds->ti)
+	if (ds->ti.empty() == false)
 	    ti = ds->ti[ds->i];
 	/* Using parent's pool so we can just use the same id's */
 	cds = singleDSPool(ds->pool, ds->tagN, ds->N[ds->i], ds->EVR[ds->i],
@@ -467,39 +455,23 @@ rpmds rpmdsCurrent(rpmds ds)
 
 rpmds rpmdsFilterTi(rpmds ds, int ti)
 {
-    int i, i2, tiCount = 0;
-    rpmds fds;
-
-    if (ds == NULL || !ds->ti || !ds->Count)
+    if (ds == NULL)
 	return NULL;
 
-    for (i = 0; i < ds->Count; i++) {
-	if (ds->ti[i] == ti)
-	    tiCount++;
+    rpmds fds = NULL;
+    for (size_t i = 0; i < ds->ti.size(); i++) {
+	if (ds->ti[i] != ti)
+	    continue;
+
+	if (fds == NULL)
+	    fds = rpmdsCreate(ds->pool, ds->tagN, ds->Type, 0, ds->instance);
+
+	fds->N.push_back(ds->N[i]);
+	fds->EVR.push_back(ds->EVR[i]);
+	fds->Flags.push_back(ds->Flags[i]);
+	fds->ti.push_back(ds->ti[i]);
+	fds->Count++;
     }
-
-    if (!tiCount)
-	return NULL;
-
-    fds = rpmdsCreate(ds->pool, ds->tagN, ds->Type, tiCount, ds->instance);
-
-    fds->N = (rpmsid *)xmalloc(tiCount * sizeof(*fds->N));
-    fds->EVR = (rpmsid *)xmalloc(tiCount * sizeof(*fds->EVR));
-    fds->Flags = (uint32_t *)xmalloc(tiCount * sizeof(*fds->Flags));
-    fds->ti = (int *)xmalloc(tiCount * sizeof(*fds->ti));
-    fds->i = -1;
-
-    i2 = 0;
-    for (i = 0; i < ds->Count; i++) {
-	if (ds->ti[i] == ti) {
-	    fds->N[i2] = ds->N[i];
-	    fds->EVR[i2] = ds->EVR[i];
-	    fds->Flags[i2] = ds->Flags[i];
-	    fds->ti[i2] = ds->ti[i];
-	    i2++;
-	}
-    }
-
     return fds;
 }
 
@@ -519,7 +491,7 @@ int rpmdsPutToHeader(rpmds ds, Header h)
 	headerPutString(h, tagN, rpmdsN(pi));
 	headerPutString(h, tagEVR, rpmdsEVR(pi));
 	headerPutUint32(h, tagF, &flags, 1);
-	if (tagTi != RPMTAG_NOT_FOUND) {
+	if (tagTi) {
 	    headerPutUint32(h, tagTi, &index, 1);
 	}
     }
@@ -542,7 +514,7 @@ int rpmdsSetIx(rpmds ds, int ix)
 
     if (ds != NULL && ix >= 0 && ix < ds->Count) {
 	ds->i = ix;
-	ds->DNEVR = _free(ds->DNEVR);
+	ds->DNEVR.clear();
 	i = ds->i;
     }
     return i;
@@ -562,11 +534,11 @@ const char * rpmdsDNEVR(const rpmds ds)
     const char * DNEVR = NULL;
 
     if (ds != NULL && ds->i >= 0 && ds->i < ds->Count) {
-	if (ds->DNEVR == NULL) {
+	if (ds->DNEVR.empty()) {
 	    char t[2] = { tagNToChar(ds->tagN), '\0' };
-	    ds->DNEVR = rpmdsNewDNEVR(t, ds);
+	    ds->DNEVR = rpmdsNewDNEVRStr(t, ds);
 	}
-	DNEVR = ds->DNEVR;
+	DNEVR = ds->DNEVR.c_str();
     }
     return DNEVR;
 }
@@ -598,12 +570,12 @@ rpmsenseFlags rpmdsFlags(const rpmds ds)
 
 int rpmdsTi(const rpmds ds)
 {
-    return (ds != NULL) ? rpmdsTiIndex(ds, ds->i) : 0;
+    return (ds != NULL) ? rpmdsTiIndex(ds, ds->i) : -1;
 }
 
 rpmTagVal rpmdsTagN(const rpmds ds)
 {
-    rpmTagVal tagN = RPMTAG_NOT_FOUND;
+    rpmTagVal tagN = 0;
 
     if (ds != NULL)
 	tagN = ds->tagN;
@@ -612,7 +584,7 @@ rpmTagVal rpmdsTagN(const rpmds ds)
 
 rpmTagVal rpmdsTagEVR(const rpmds ds)
 {
-    rpmTagVal tagEVR = RPMTAG_NOT_FOUND;
+    rpmTagVal tagEVR = 0;
 
     if (ds != NULL)
 	dsType(ds->tagN, NULL, &tagEVR, NULL, NULL);
@@ -621,7 +593,7 @@ rpmTagVal rpmdsTagEVR(const rpmds ds)
 
 rpmTagVal rpmdsTagF(const rpmds ds)
 {
-    rpmTagVal tagF = RPMTAG_NOT_FOUND;
+    rpmTagVal tagF = 0;
 
     if (ds != NULL)
 	dsType(ds->tagN, NULL, NULL, &tagF, NULL);
@@ -630,7 +602,7 @@ rpmTagVal rpmdsTagF(const rpmds ds)
 
 rpmTagVal rpmdsTagTi(const rpmds ds)
 {
-    rpmTagVal tagTi = RPMTAG_NOT_FOUND;
+    rpmTagVal tagTi = 0;
 
     if (ds != NULL)
 	dsType(ds->tagN, NULL, NULL, NULL, &tagTi);
@@ -652,8 +624,9 @@ rpm_color_t rpmdsSetColor(const rpmds ds, rpm_color_t color)
     rpm_color_t ocolor = 0;
 
     if (ds != NULL && ds->i >= 0 && ds->i < ds->Count) {
-	if (ds->Color == NULL) {
-	    ds->Color = (uint32_t *)xcalloc(ds->Count, sizeof(*ds->Color));
+	if (ds->Color.empty()) {
+	    ds->Color.resize(ds->Count);
+	    ds->Color.assign(ds->Count, 0);
 	}
 	ocolor = ds->Color[ds->i];
 	ds->Color[ds->i] = color;
@@ -692,7 +665,7 @@ rpmds rpmdsInit(rpmds ds)
 {
     if (ds != NULL) {
 	ds->i = -1;
-	ds->DNEVR = _free(ds->DNEVR);
+	ds->DNEVR.clear();
     }
     return ds;
 }
@@ -701,28 +674,13 @@ static rpmds rpmdsDup(const rpmds ods)
 {
     rpmds ds = rpmdsCreate(ods->pool, ods->tagN, ods->Type,
 			   ods->Count, ods->instance);
-    size_t nb;
     
     ds->i = ods->i;
 
-    nb = ds->Count * sizeof(*ds->N);
-    ds->N = (rpmsid *)memcpy(xmalloc(nb), ods->N, nb);
-    
-    /* XXX rpm prior to 3.0.2 did not always supply EVR and Flags. */
-    if (ods->EVR) {
-	nb = ds->Count * sizeof(*ds->EVR);
-	ds->EVR = (rpmsid *)memcpy(xmalloc(nb), ods->EVR, nb);
-    }
-
-    if (ods->Flags) {
-	nb = ds->Count * sizeof(*ds->Flags);
-	ds->Flags = (uint32_t *)memcpy(xmalloc(nb), ods->Flags, nb);
-    }
-
-    if (ods->ti) {
-	nb = ds->Count * sizeof(*ds->ti);
-	ds->ti = (int *)memcpy(xmalloc(nb), ods->ti, nb);
-    }
+    ds->N = ods->N;
+    ds->EVR = ods->EVR;
+    ds->Flags = ods->Flags;
+    ds->ti = ods->ti;
 
     return ds;
 
@@ -752,7 +710,6 @@ static int doFind(rpmds ds, const rpmds ods, unsigned int *he)
 
 	comparison = strcmp(ON, N);
 
-	/* XXX rpm prior to 3.0.2 did not always supply EVR and Flags. */
 	if (comparison == 0 && OEVR && EVR)
 	    comparison = strcmp(OEVR, EVR);
 	if (comparison == 0)
@@ -802,16 +759,12 @@ int rpmdsMerge(rpmds * dsp, rpmds ods)
 	return -1;
 
     /* Ensure EVR and Flags exist */
-    if (ds->EVR == NULL)
-	ds->EVR = (rpmsid *)xcalloc(ds->Count, sizeof(*ds->EVR));
-    if (ds->Flags == NULL)
-	ds->Flags = (uint32_t *)xcalloc(ds->Count, sizeof(*ds->Flags));
-    if (ds->ti == NULL && ods->ti) {
-	int i;
-	ds->ti = (int *)xcalloc(ds->Count, sizeof(*ds->ti));
-	for (i = 0; i < ds->Count; i++)
-	    ds->ti[i] = -1;
-    }
+    if (ds->EVR.empty())
+	ds->EVR.assign(ds->Count, 0);
+    if (ds->Flags.empty())
+	ds->Flags.assign(ds->Count, 0);
+    if (ds->ti.empty() && ods->ti.empty() == false)
+	ds->ti.assign(ds->Count, -1);
 
     /*
      * Add new entries.
@@ -819,7 +772,6 @@ int rpmdsMerge(rpmds * dsp, rpmds ods)
     save = ods->i;
     ods = rpmdsInit(ods);
     while (rpmdsNext(ods) >= 0) {
-	const char *OEVR;
 	unsigned int u;
 	/*
 	 * If this entry is already present, don't bother.
@@ -831,36 +783,14 @@ int rpmdsMerge(rpmds * dsp, rpmds ods)
 	 * Insert new entry. Ensure pool is unfrozen to allow additions.
 	 */
 	rpmstrPoolUnfreeze(ds->pool);
-	ds->N = xrealloc(ds->N, (ds->Count+1) * sizeof(*ds->N));
-	if (u < ds->Count) {
-	    memmove(ds->N + u + 1, ds->N + u,
-		    (ds->Count - u) * sizeof(*ds->N));
-	}
-	ds->N[u] = rpmstrPoolId(ds->pool, rpmdsN(ods), 1);
+	ds->N.insert(ds->N.begin() + u,
+			rpmstrPoolId(ds->pool, rpmdsN(ods), 1));
+	ds->EVR.insert(ds->EVR.begin() + u,
+			rpmstrPoolId(ds->pool, rpmdsEVR(ods), 1));
+	ds->Flags.insert(ds->Flags.begin() + u, rpmdsFlags(ods));
 
-	ds->EVR = xrealloc(ds->EVR, (ds->Count+1) * sizeof(*ds->EVR));
-	if (u < ds->Count) {
-	    memmove(ds->EVR + u + 1, ds->EVR + u,
-		    (ds->Count - u) * sizeof(*ds->EVR));
-	}
-	OEVR = rpmdsEVR(ods);
-	ds->EVR[u] = rpmstrPoolId(ds->pool, OEVR ? OEVR : "", 1);
-
-	ds->Flags = xrealloc(ds->Flags, (ds->Count+1) * sizeof(*ds->Flags));
-	if (u < ds->Count) {
-	    memmove(ds->Flags + u + 1, ds->Flags + u,
-		    (ds->Count - u) * sizeof(*ds->Flags));
-	}
-	ds->Flags[u] = rpmdsFlags(ods);
-
-	if (ds->ti || ods->ti) {
-	    ds->ti = xrealloc(ds->ti, (ds->Count+1) * sizeof(*ds->ti));
-	    if (u < ds->Count) {
-		memmove(ds->ti + u + 1, ds->ti + u,
-			(ds->Count - u) * sizeof(*ds->ti));
-	    }
-	    ds->ti[u] = rpmdsTi(ods);
-	}
+	if (ds->ti.empty() == false || ods->ti.empty() == false)
+	    ds->ti.insert(ds->ti.begin() + u, rpmdsTi(ods));
 
 	ds->i = ds->Count;
 	ds->Count++;
@@ -935,12 +865,6 @@ int rpmdsCompareIndex(rpmds A, int aix, rpmds B, int bix)
     if (!rpmstrPoolStreq(A->pool, rpmdsNIdIndex(A, aix),
 			 B->pool, rpmdsNIdIndex(B, bix))) {
 	result = 0;
-	goto exit;
-    }
-
-    /* XXX rpm prior to 3.0.2 did not always supply EVR and Flags. */
-    if (!(A->EVR && A->Flags && B->EVR && B->Flags)) {
-	result = 1;
 	goto exit;
     }
 
@@ -1521,16 +1445,13 @@ static rpmRC rpmdsParseRichDepCB(void *cbdata, rpmrichParseType type,
     else if (type == RPMRICH_PARSE_LEAVE) {
 	if (--data->depth == 0 && data->dochain && data->rightstart) {
 	    /* chain op hack, construct a sub-ds from the right side of the chain */
-	    char *right = (char *)xmalloc(n + nl - data->rightstart + 2);
-	    right[0] = '(';
-	    strncpy(right + 1, data->rightstart, n + nl - data->rightstart);
-	    right[n + nl - data->rightstart + 1] = 0;
+	    string right = "(";
+	    right.append(data->rightstart, n + nl - data->rightstart);
 	    data->rightds = rpmdsFree(data->rightds);
 	    ds = singleDS(data->dep->pool, data->dep->tagN, 0, 0, data->depflags, 0, 0, 0);
-	    ds->N[0] = rpmstrPoolId(ds->pool, right, 1);
+	    ds->N[0] = rpmstrPoolId(ds->pool, right.c_str(), 1);
 	    ds->EVR[0] = rpmstrPoolId(ds->pool, "", 1);
 	    data->rightds = ds;
-	    free(right);
 	}
     }
     if (data->depth != 1)

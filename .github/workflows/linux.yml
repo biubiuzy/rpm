@@ -1,6 +1,16 @@
 name: Linux CI
 
-on: [push, pull_request]
+on:
+  push:
+    paths-ignore: &docfiles
+      - '**.md'
+      - 'COPYING'
+      - 'CREDITS'
+      - 'INSTALL'
+      - 'README'
+      - 'docs/**'
+  pull_request:
+    paths-ignore: *docfiles
 
 jobs:
   build_and_test:

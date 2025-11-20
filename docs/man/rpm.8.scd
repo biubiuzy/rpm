@@ -82,12 +82,33 @@ code and recipe necessary to produce binary packages.
 *--querytags*
 	Dump known querytags. Useful with the *--queryformat* option.
 
+## Obsolete compatibility aliases
+These are obsolete *popt*(3) aliases for backwards compatibility only,
+and their use is discouraged.
+
+*--initdb*,
+*--rebuilddb*,
+*--verifydb*
+	See *rpmdb*(8).
+
+*--addsign*,
+*--delsign*,
+*--resign*
+	See *rpmsign*(1).
+
+*-K*,
+*--checksig*,
+*--import*
+	See *rpmkeys*(8).
+
+*--specfile*
+	See *rpmspec*(1).
+
 See *rpm-common*(8) for the operations common to all rpm executables.
 
 # ARGUMENTS
 _PACKAGE_FILE_
-	Either *rpm* binary file or ASCII package manifest
-	(see *PACKAGE SELECTION OPTIONS*), and may be
+	Either an *rpm* package or an *rpm-manifest*(5) file. May also be
 	specified as an *ftp* or *http* URL, in which case the package will
 	be downloaded before being installed. See *FTP/HTTP OPTIONS* for
 	information on *rpm*'s *ftp* and *http* client support.
@@ -131,7 +152,7 @@ See *rpm-common*(8) for the options common to all operations.
 	*--oldpackage*.
 
 *--ignoresize*
-	Don't check mount file systems for sufficient disk space before
+	Don't check mount filesystems for sufficient disk space before
 	installing this package.
 
 *--ignorearch*
@@ -275,20 +296,20 @@ selection and information selection.
 	Query package owning installed _FILE_.
 
 *--filecaps*
-	List file names with POSIX1.e capabilities.
+	List filenames with POSIX1.e capabilities.
 
 *--fileclass*
-	List file names with their classes (libmagic classification).
+	List filenames with their classes (libmagic classification).
 
 *--filecolor*
-	List file names with their colors (0 for noarch, 1 for 32bit, 2 for
+	List filenames with their colors (0 for noarch, 1 for 32bit, 2 for
 	64 bit).
 
 *--fileprovide*
-	List file names with their provides.
+	List filenames with their provides.
 
 *--filerequire*
-	List file names with their requires.
+	List filenames with their requires.
 
 *-g*, *--group* _GROUP_
 	Query packages with the group of _GROUP_.
@@ -297,21 +318,10 @@ selection and information selection.
 	Do not glob arguments when installing package files.
 
 *--nomanifest*
-	Don't process non-package files as manifests.
+	Don't process non-package files as *rpm-manifest*(5) files.
 
 *-p*, *--package* _PACKAGE_FILE_
-	Query an (uninstalled) package _PACKAGE_FILE_. The _PACKAGE_FILE_
-	may be specified as an *ftp* or *http* style URL, in which case
-	the package header will be downloaded and queried. See *FTP/HTTP
-	OPTIONS* for information on *rpm*'s *ftp* and *http* client
-	support. The _PACKAGE_FILE_ argument(s), if not a binary package,
-	will be interpreted as an ASCII package manifest unless
-	*--nomanifest* option is used. In manifests, comments are
-	permitted, starting with a '*#*', and each line of a package
-	manifest file may include white space separated glob expressions,
-	including URL's, that will be expanded to paths that are
-	substituted in place of the package manifest as additional
-	_PACKAGE_FILE_ arguments to the query.
+	Query an (uninstalled) package _PACKAGE_FILE_.
 
 *--path* _PATH_
 	Query package(s) owning _PATH_, whether the file is installed or not.
@@ -327,7 +337,7 @@ selection and information selection.
 
 *--tid* _TID_
 	Query package(s) that have a given _TID_ transaction identifier. A
-	UNIX time stamp is currently used as a transaction identifier. All
+	UNIX timestamp is currently used as a transaction identifier. All
 	package(s) installed or erased within a single transaction have a
 	common identifier.
 
@@ -365,7 +375,7 @@ selection and information selection.
 	Display change information for the package.
 
 *--changes*
-	Display change information for the package with full time stamps.
+	Display change information for the package with full timestamps.
 
 *--conflicts*
 	List capabilities this package conflicts with.
@@ -454,8 +464,8 @@ selection and information selection.
 # VERIFY OPTIONS
 
 The package and file selection options are the same as for package
-querying (including package manifest files as arguments). Other options
-unique to verify mode are:
+querying (including *rpm-manifest*(5) files as arguments).
+Other options unique to verify mode are:
 
 *--nodeps*
 	Don't verify dependencies of packages.
@@ -491,7 +501,7 @@ unique to verify mode are:
 # OUTPUT
 *--verify*
 	The format of the output is a string of 9 _result_ characters
-	a possible _attribute_ from the package, followed by the file name.
+	a possible _attribute_ from the package, followed by the filename.
 
 	Each of the 9 characters denotes the result of a comparison of
 	attribute(s) of the file to the value of those attribute(s)
@@ -547,7 +557,71 @@ unique to verify mode are:
 
 
 # EXIT STATUS
-On success, 0 is returned, a non-zero failure code otherwise.
+On success, 0 is returned, a nonzero failure code otherwise.
+
+# EXAMPLES
+*rpm -Uvh hello-2.0-1.noarch.rpm*
+	Install or upgrade _hello-2.0-1.noarch.rpm_ package with verbose output
+	and progress meters. *-Uvh* is probably the most common of all
+	the *rpm* operations.
+
+*rpm -Uvh --excludedocs --root /srv/test mydist-23.mft*
+	Install packages described by the _mydist-23.mft_ *rpm-manifest*(5)
+	file into the alternative system root at _/srv/test_, excluding
+	all documentation files.
+
+*rpm -Fvh \*.rpm*
+	Freshen installed packages from a local directory, with verbose
+	output and progress meters.
+
+*rpm -i kernel-6.15.4-200.x86_64.rpm*
+	Install _kernel-6.15.4-200.x86_64.rpm_ package quietly. On some
+	Linux distributions, different kernel versions are intended to be
+	installed in parallel like this, _without_ erasing older ones to
+	ensure there's a bootable kernel in case of problems. It's one
+	of the few cases where *-i* is the right thing to use.
+
+*rpm -evh --allmatches libhello*
+	Erase all versions of package *libhello* on the system, with
+	verbose output and progress meters. Typically there is only one
+	version of a package installed at a time, but in some cases it's
+	possible to have different versions or different architectures
+	of a package installed in parallel, in which case *--allmatches*
+	can be handy.
+
+*rpm -vh --reinstall hello-2.0-1.noarch.rpm*
+	Reinstall previously installed _hello-2.0-1.noarch.rpm_ package,
+	with verbose output and progress labels.
+	Useful if eg. the files of a package get corrupted or
+	erased accidentally.
+
+*rpm -v --restore --all*
+	Restore permissions of files in all installed packages to their
+	packaged specifications, with verbose output.
+
+*rpm --verify --noconfig openssh-server*
+	Verify the integrity of the installed *openssh-server* package,
+	ignoring changes in configuration.
+
+*rpm -qa*
+	List all installed packages, using the default formatting.
+
+*rpm -qlv --noartifact glibc*
+	List the files of the *glibc* package in style similar to
+	*ls*(1) command output with *ls -l*, omitting "artifact" files
+	such as build-id's which are not usually the main interest.
+
+*rpm -q --qf "[%{filenames} %{filedigests}\\n]" openssh-server*
+	List filenames and their corresponding digests of installed
+	*openssh-server* package.
+
+*rpm -qp --scripts --triggers --filetriggers myserver-1.0-1.x86_64.rpm*
+	Show all scriptlets and triggers from the _myserver-1.0-1.x86_64.rpm_
+	package file. Before installing unknown packages, at least do this!
+
+*rpm --target ppc64le --eval "%optflags"*
+	Print the expansion of the *%optflags* macro for the *ppc64le*
+	architecture.
 
 # FILES
 See *rpm-common*(8), *rpm-config*(5) and *rpm-rpmrc*(5).
@@ -555,6 +629,7 @@ See *rpm-common*(8), *rpm-config*(5) and *rpm-rpmrc*(5).
 # SEE ALSO
 *rpm-common*(8), *popt*(3), *rpm2cpio*(1), *rpmbuild*(1), *rpmdb*(8),
 *rpmkeys*(8), *rpmsign*(1), *rpmspec*(1), *rpm-queryformat*(7)
+*rpm-manifest*(5) *rpm-version*(7) *rpm-plugins*(8)
 
 *rpm --help* - as *rpm* supports customizing the options via popt
 aliases it's impossible to guarantee that what's described in the
