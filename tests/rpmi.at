@@ -227,6 +227,18 @@ runroot rpm -U --ignorearch --ignoreos --nodeps \
 ])
 
 RPMTEST_CHECK([
+runroot rpm -U --ignorearch --ignoreos --nodeps \
+	--define "_pkgverify_flags 0xfffff" \
+	--define "__vsflags 0x30300" \
+	--define "_pkgverify_level digest" \
+	/tmp/${pkg}
+],
+[1],
+[],
+[	package hello-2.0-1.x86_64 does not verify: no verifiable digest or signature available
+])
+
+RPMTEST_CHECK([
 runroot --setenv SOURCE_DATE_EPOCH 1234 \
 	rpm -U --ignorearch --ignoreos --nodeps --nodigest --noverify \
 	--define "_pkgverify_level digest" \
@@ -459,6 +471,19 @@ runroot rpm -U --ignorearch --ignoreos --nodeps \
 
 RPMTEST_CHECK([
 runroot rpm -U --ignorearch --ignoreos --nodeps \
+	--define "_pkgverify_flags 0xc0c00" \
+	--define "__vsflags 0xc0c00" \
+	--define "_pkgverify_level signature" \
+	/tmp/${pkg}
+],
+[1],
+[],
+[	package hello-2.0-1.x86_64 does not verify: Payload SHA256 digest: BAD (Expected 84a7338287bf19715c4eed0243f5cdb447eeb0ade37b2af718d4060aefca2f7c != 3129d507d00b1dc60745d9637010b5d82059ebeff2318b2db75b26272b823586)
+])
+
+RPMTEST_CHECK([
+runroot rpm -U --ignorearch --ignoreos --nodeps \
+	--nodigest \
 	--define "_pkgverify_flags 0xc0c00" \
 	--define "__vsflags 0xc0c00" \
 	--define "_pkgverify_level signature" \
@@ -738,6 +763,138 @@ error: open of not_pkg.rpm failed: No such file or directory
 ])
 RPMTEST_CLEANUP
 
+RPMTEST_SETUP_RW([install from url])
+AT_KEYWORDS([install urlhelper manifest])
+AT_SKIP_IF([test -z "${PYTHON}"])
+
+# Startup a http server, serving from /data, for the duration of this
+# test-group. It's visible to other tests running in parallel, though.
+RPMTEST_CHECK([
+daemonize -p ${HOME}/http.pid -o http.log -- ${PYTHON} -m http.server --bind 127.0.0.1 --directory /data
+],
+[0],
+[ignore],
+[ignore])
+
+# nonexistent remote package
+RPMTEST_CHECK([
+runroot rpm -Uv --nodeps --nosignature \
+		http://127.0.0.1:8000/RPMS/wello-2.0-1.x86_64.rpm
+],
+[1],
+[Retrieving http://127.0.0.1:8000/RPMS/wello-2.0-1.x86_64.rpm
+],
+[stderr])
+
+RPMTEST_CHECK([
+grep "error: skipping" stderr
+],
+[0],
+[error: skipping http://127.0.0.1:8000/RPMS/wello-2.0-1.x86_64.rpm - transfer failed
+],
+[])
+
+# existing remote packages
+RPMTEST_CHECK([
+runroot rpm -Uv --nodeps --nosignature --nodb \
+		http://127.0.0.1:8000/RPMS/hello-2.0-1.x86_64.rpm \
+		http://127.0.0.1:8000/RPMS/hlinktest-1.0-1.noarch.rpm
+],
+[0],
+[Retrieving http://127.0.0.1:8000/RPMS/hello-2.0-1.x86_64.rpm
+Retrieving http://127.0.0.1:8000/RPMS/hlinktest-1.0-1.noarch.rpm
+Verifying packages...
+Preparing packages...
+hlinktest-1.0-1.noarch
+hello-2.0-1.x86_64
+],
+[])
+
+# mixture of existing and non-existent remote packages in a local manifest
+RPMTEST_CHECK([
+cat << EOF > ${RPMTEST}/tmp/pkgs.mft
+http://127.0.0.1:8000/RPMS/hello-2.0-1.x86_64.rpm
+http://127.0.0.1:8000/RPMS/nolinktest-1.0-1.noarch.rpm
+http://127.0.0.1:8000/RPMS/foo-1.0-1.noarch.rpm
+EOF
+
+runroot rpm -Uv --nodeps --nosignature --nodb /tmp/pkgs.mft
+],
+[1],
+[Retrieving http://127.0.0.1:8000/RPMS/hello-2.0-1.x86_64.rpm
+Retrieving http://127.0.0.1:8000/RPMS/nolinktest-1.0-1.noarch.rpm
+Retrieving http://127.0.0.1:8000/RPMS/foo-1.0-1.noarch.rpm
+],
+[stderr])
+
+RPMTEST_CHECK([
+grep "error: skipping" stderr
+],
+[0],
+[error: skipping http://127.0.0.1:8000/RPMS/nolinktest-1.0-1.noarch.rpm - transfer failed
+],
+[])
+
+# existing remote packages in a local manifest
+RPMTEST_CHECK([
+cat << EOF > ${RPMTEST}/tmp/pkgs.mft
+http://127.0.0.1:8000/RPMS/hello-2.0-1.x86_64.rpm
+http://127.0.0.1:8000/RPMS/hlinktest-1.0-1.noarch.rpm
+EOF
+
+runroot rpm -Uv --nodeps --nosignature --nodb /tmp/pkgs.mft
+],
+[0],
+[Retrieving http://127.0.0.1:8000/RPMS/hello-2.0-1.x86_64.rpm
+Retrieving http://127.0.0.1:8000/RPMS/hlinktest-1.0-1.noarch.rpm
+Verifying packages...
+Preparing packages...
+hlinktest-1.0-1.noarch
+hello-2.0-1.x86_64
+],
+[])
+
+# existing local packages in a remote manifest
+RPMTEST_CHECK([
+runroot rpm -Uv --nodeps --nosignature --nodb \
+	http://127.0.0.1:8000/misc/localpkgs.mft
+],
+[0],
+[Retrieving http://127.0.0.1:8000/misc/localpkgs.mft
+Verifying packages...
+Preparing packages...
+hlinktest-1.0-1.noarch
+hello-2.0-1.x86_64
+],
+[])
+
+# mixture of local and remote packages in remote manifests
+RPMTEST_CHECK([
+runroot rpm -Uv --nodeps --nosignature --nodb \
+	http://127.0.0.1:8000/misc/remotepkgs.mft
+],
+[0],
+[Retrieving http://127.0.0.1:8000/misc/remotepkgs.mft
+Retrieving http://127.0.0.1:8000/RPMS/foo-1.0-1.noarch.rpm
+Retrieving http://127.0.0.1:8000/misc/localpkgs.mft
+Retrieving http://127.0.0.1:8000/RPMS/imatest-1.0-1.fc34.noarch.rpm
+Verifying packages...
+Preparing packages...
+hlinktest-1.0-1.noarch
+hello-2.0-1.x86_64
+test-1.0-1.fc34.noarch
+foo-1.0-1.noarch
+],
+[])
+
+RPMTEST_CHECK([
+kill $(cat ${HOME}/http.pid)
+],
+[0],
+[],
+[])
+RPMTEST_CLEANUP
+
 # ------------------------------
 RPMTEST_SETUP_RW([rpm upgrade/downgrade])
 
@@ -920,7 +1077,7 @@ for e in 1 2; do
     runroot cp /build/RPMS/noarch/versiontest-1.0-1.noarch.rpm /tmp/epoch${e}.rpm
 done
 # for testing sanity
-echo '%_query_all_fmt %%{nevra}' >> ${HOME}/.config/rpm/macros
+echo '%_query_all_fmt<l> %{nevra}' >> ${HOME}/.config/rpm/macros
 
 RPMTEST_CHECK([
 RPMDB_RESET
@@ -1647,6 +1804,8 @@ group(klong)
 user(klangd)
 user(klangd)
 user(plong)
+group(klang)
+user(plong)
 Provides
 group(klang) = ZyBrbGFuZyAt
 group(klangd)
@@ -1675,6 +1834,8 @@ group(klong)
 group(klong)
 user(klangd)
 user(klangd)
+user(plong)
+group(klang)
 user(plong)
 Provides
 group(klang) = ZyBrbGFuZyAt
@@ -1752,6 +1913,104 @@ klangd
 
 RPMTEST_CLEANUP
 
+RPMTEST_SETUP_RW([rpm -i user/group lookup])
+AT_KEYWORDS([])
+
+# Symlink to read-only file /etc/authselect/nsswitch.conf
+rm $RPMTEST/etc/nsswitch.conf
+
+# Set up nss-altfiles
+echo "passwd: files altfiles" > $RPMTEST/etc/nsswitch.conf
+echo "group: files altfiles" >> $RPMTEST/etc/nsswitch.conf
+
+# Create dummy passwd and group files
+echo "foobar:x:12345:12345:foobar:/:/usr/sbin/nologin" > passwd
+echo "foobar:x:12345:foobar" > group
+
+runroot rpmbuild --quiet -bb --with fileown /data/SPECS/hello.spec
+
+# Root: system (default)
+# Path macros: undefined
+# Expected lookup: by NSS
+RPMTEST_CHECK([
+cp passwd group $RPMTEST/usr/lib/
+
+runroot rpm -i --nodeps /build/RPMS/x86_64/hello-1.0-1.x86_64.rpm; rc=$?
+runroot stat -c '%u %g' /usr/local/bin/hello
+
+runroot rpm -e hello
+rm $RPMTEST/usr/lib/{passwd,group}
+exit $rc
+],
+[0],
+[12345 12345
+],
+[])
+
+# Root: alternative
+# Path macros: undefined
+# Expected lookup: by RPM in default paths
+RPMTEST_CHECK([
+runroot rpm -i --noplugins --nodeps --nosignature \
+	    --root /alt /build/RPMS/x86_64/hello-1.0-1.x86_64.rpm; rc=$?
+runroot stat -c '%u %g' /alt/usr/local/bin/hello
+
+rm -rf $RPMTEST/alt
+exit $rc
+],
+[0],
+[0 0
+],
+[error: failed to open /etc/passwd for id/name lookup: No such file or directory
+warning: user foobar does not exist - using root
+error: failed to open /etc/group for id/name lookup: No such file or directory
+warning: group foobar does not exist - using root
+])
+
+# Root: system (default)
+# Path macros: defined
+# Expected lookup: by RPM in configured paths
+RPMTEST_CHECK([
+mkdir -p $RPMTEST/opt
+cp passwd group $RPMTEST/opt/
+
+runroot rpm -i --noplugins --nodeps --nosignature \
+	    --define "_passwd_path /opt/passwd" \
+	    --define "_group_path /opt/group" \
+	    /build/RPMS/x86_64/hello-1.0-1.x86_64.rpm; rc=$?
+runroot stat -c '%u %g' /usr/local/bin/hello
+
+runroot rpm -e hello
+rm $RPMTEST/opt/{passwd,group}
+exit $rc
+],
+[0],
+[12345 12345
+],
+[])
+
+# Root: alternative
+# Path macros: defined
+# Expected lookup: by RPM in configured paths
+RPMTEST_CHECK([
+mkdir -p $RPMTEST/alt/opt
+cp passwd group $RPMTEST/alt/opt/
+
+runroot rpm -i --noplugins --nodeps --nosignature \
+	    --define "_passwd_path /opt/passwd" \
+	    --define "_group_path /opt/group" \
+	    --root /alt /build/RPMS/x86_64/hello-1.0-1.x86_64.rpm; rc=$?
+runroot stat -c '%u %g' /alt/usr/local/bin/hello
+
+rm -rf $RPMTEST/alt
+exit $rc
+],
+[0],
+[12345 12345
+],
+[])
+RPMTEST_CLEANUP
+
 RPMTEST_SETUP_RW([install on invalid symlinked directory])
 AT_KEYWORDS([install])
 
@@ -1823,4 +2082,68 @@ runroot rpm -U --nodb --test --ignorearch --ignoreos --nodeps --nosignature \
 [],
 [	installing package hello-2.0-1.x86_64 needs 36KB more space on the / filesystem
 ])
+RPMTEST_CLEANUP
+
+RPMTEST_SETUP_RW([run rpm from scriptlet])
+AT_KEYWORDS([install query script])
+RPMTEST_CHECK([
+runroot rpmbuild -bb \
+	/data/SPECS/fakeshell.spec \
+	/data/SPECS/selfquery.spec \
+	/data/SPECS/selfinst.spec \
+	/data/SPECS/selfkeys.spec \
+	/data/SPECS/selfimport.spec
+runroot rpm -U /build/RPMS/noarch/fakeshell-1.0-1.noarch.rpm
+],
+[0],
+[ignore],
+[ignore])
+
+RPMTEST_CHECK([
+runroot rpm -U /build/RPMS/noarch/selfkeys-1-1.noarch.rpm
+],
+[0],
+[PRETRANS
+1
+POSTTRANS
+1
+],
+[])
+
+RPMTEST_CHECK([
+runroot rpm -U /build/RPMS/noarch/selfimport-1-1.noarch.rpm
+],
+[0],
+[PRETRANS
+1
+POSTTRANS
+1
+],
+[error: can't create keyring lock on /var/lib/rpm-testsuite/.keyring.lock (Resource temporarily unavailable)
+error: /data/keys/rpm.org-rsa-2048-test.pub: key 1 import failed.
+error: can't create keyring lock on /var/lib/rpm-testsuite/.keyring.lock (Resource temporarily unavailable)
+error: /data/keys/rpm.org-rsa-2048-test.pub: key 1 import failed.
+])
+
+RPMTEST_CHECK([
+runroot rpm -U /build/RPMS/noarch/selfquery-1-1.noarch.rpm
+],
+[0],
+[PRETRANS
+package selfquery is not installed
+POSTTRANS
+selfquery-1-1.noarch
+],
+[])
+
+RPMTEST_CHECK([
+runroot rpm -U /build/RPMS/noarch/selfinst-1-1.noarch.rpm
+],
+[0],
+[PRETRANS
+1
+POSTTRANS
+1
+],
+[ignore])
 RPMTEST_CLEANUP

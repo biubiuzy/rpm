@@ -106,6 +106,7 @@ function(makemacros)
 	set(infodir "\${prefix}/${CMAKE_INSTALL_INFODIR}")
 	set(mandir "\${prefix}/${CMAKE_INSTALL_MANDIR}")
 	set(rundir /run)
+	set(bindir_full ${CMAKE_INSTALL_FULL_BINDIR})
 
 	pkg_get_variable(sysusersdir systemd sysusersdir)
 	if (NOT sysusersdir)
@@ -115,6 +116,7 @@ function(makemacros)
 	findutil(__7ZIP "7za;7z")
 	findutil(__BZIP2 bzip2)
 	findutil(__CAT cat)
+	findutil(__CAR car)
 	findutil(__CHMOD chmod)
 	findutil(__CHOWN chown)
 	findutil(__CP cp)
@@ -191,7 +193,7 @@ include(CheckVariableExists)
 set(OPTFUNCS
 	stpcpy stpncpy putenv mempcpy fdatasync lutimes mergesort
 	getauxval setprogname __progname syncfs sched_getaffinity unshare
-	secure_getenv __secure_getenv mremap strchrnul
+	secure_getenv __secure_getenv mremap strchrnul close_range
 )
 set(REQFUNCS
 	mkstemp getcwd basename dirname realpath setenv unsetenv regcomp

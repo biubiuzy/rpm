@@ -1640,6 +1640,58 @@ rpmRC rpmfcApply(rpmfc fc)
     return rc;
 }
 
+static string rpmfcPrettyFType(rpmfc fc, unsigned ix)
+{
+    string ftype = fc->ftype[ix];
+    size_t len = ftype.find(' ', 10);
+    return ftype.substr(0, len);
+}
+
+static rpmRC rpmfcCheckPackageColor(rpmfc fc)
+{
+    Package pkg = fc->pkg;
+    const char *a = headerGetString(pkg->header, RPMTAG_ARCH);
+    string msg;
+    int header_color = headerGetNumber(pkg->header, RPMTAG_HEADERCOLOR);
+    int arch_color = rpmGetArchColor(a);
+    bool is_noarch = rstreq(a, "noarch");
+    bool terminate = false;
+
+    /* Return early if no outlier binaries are present */
+    if (is_noarch) {
+	if (!header_color)
+	    return RPMRC_OK;
+	terminate = rpmExpandNumeric("%{?_binaries_in_noarch_packages_terminate_build}");
+	msg = _("Arch dependent binaries in noarch package (%s):\n%s");
+    } else if (arch_color <= 0 || header_color <= 0) {
+	return RPMRC_OK;
+    } else if (!(arch_color & header_color)) {
+	msg = _("Binaries not matching package arch (%s):\n%s");
+    } else {
+	return RPMRC_OK;
+    }
+
+    /* Gather outlier binaries to print */
+    string bins;
+    for (unsigned ix = 0; ix < fc->nfiles; ix++) {
+	int color = fc->fcolor[ix];
+	if (!color || color == arch_color)
+	    continue;
+	string type = rpmfcPrettyFType(fc, ix);
+	bins += string(4, ' ') + fc->fn[ix].substr(fc->buildRoot.size());
+	if (!type.empty())
+	    bins += " (" + type + ")";
+	bins += '\n';
+    }
+
+    char *nvr = headerGetAsString(pkg->header, RPMTAG_NVRA);
+    rpmlog(terminate ? RPMLOG_ERR : RPMLOG_WARNING,
+	   msg.c_str(), nvr, bins.c_str());
+    free(nvr);
+
+    return terminate ? RPMRC_FAIL : RPMRC_OK;
+}
+
 rpmRC rpmfcGenerateDepends(const rpmSpec spec, Package pkg)
 {
     rpmfc fc = NULL;
@@ -1765,6 +1817,10 @@ rpmRC rpmfcGenerateDepends(const rpmSpec spec, Package pkg)
 	rpmfcPrint(msg, fc, NULL);
 	free(msg);
     }
+
+    rc = rpmfcCheckPackageColor(fc);
+    if (rc != RPMRC_OK)
+	goto exit;
 exit:
     printDeps(fc);
 

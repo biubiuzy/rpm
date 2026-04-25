@@ -354,16 +354,64 @@ RPMTEST_CLEANUP
 RPMTEST_SETUP_RW([rpm -q foo])
 AT_KEYWORDS([rpmdb query])
 RPMTEST_CHECK([
-
 runroot rpm -i \
-  --nosignature \
-  /data/RPMS/foo-1.0-1.noarch.rpm
+  --nosignature --nodeps \
+  /data/RPMS/foo-1.0-1.noarch.rpm \
+  /data/RPMS/hlinktest-1.0-1.noarch.rpm \
+  /data/RPMS/hello-2.0-1.x86_64.rpm
+],
+[0],
+[],
+[])
 
+RPMTEST_CHECK([
 runroot rpm -q foo
-
 ],
 [0],
 [foo-1.0-1.noarch
+],
+[])
+
+RPMTEST_CHECK([
+runroot rpm -qa name=hlinktest
+],
+[0],
+[hlinktest-1.0-1.noarch
+],
+[])
+
+RPMTEST_CHECK([
+runroot rpm -qa arch=noarch
+],
+[0],
+[hlinktest-1.0-1.noarch
+foo-1.0-1.noarch
+],
+[])
+
+# multiple patterns of different tags are and'ed
+RPMTEST_CHECK([
+runroot rpm -qa name=foo arch=noarch
+],
+[0],
+[foo-1.0-1.noarch
+],
+[])
+
+RPMTEST_CHECK([
+runroot rpm -qa name=hello arch=noarch
+],
+[0],
+[],
+[])
+
+# multiple patterns of a single tag are or'ed
+RPMTEST_CHECK([
+runroot rpm -qa name=hello name=hlinktest
+],
+[0],
+[hello-2.0-1.x86_64
+hlinktest-1.0-1.noarch
 ],
 [])
 RPMTEST_CLEANUP
@@ -556,27 +604,54 @@ runroot rpm -ql hello.i386 hello.ppc64
 RPMTEST_CLEANUP
 
 RPMTEST_SETUP_RW([rpmdb --rebuilddb])
+RPMTEST_USER
 AT_KEYWORDS([rpmdb])
-RPMTEST_CHECK([
 RPMDB_RESET
 
+RPMTEST_CHECK([
 runroot rpm -U --noscripts --nodeps --ignorearch --noverify --nosignature \
   /data/RPMS/hello-1.0-1.i386.rpm
-runroot rpm -qa --qf "%{nevra} %{dbinstance}\n"
+],
+[0],
+[],
+[])
+
+RPMTEST_CHECK([
+runroot_user rpm -qa --qf "%{nevra} %{dbinstance}\n"
+],
+[0],
+[hello-1.0-1.i386 1
+],
+[])
+
+RPMTEST_CHECK([
 runroot rpm -U --noscripts --nodeps --ignorearch --nosignature \
   /data/RPMS/hello-2.0-1.i686.rpm
-runroot rpm -qa --qf "%{nevra} %{dbinstance}\n"
+],
+[0],
+[],
+[])
+
+RPMTEST_CHECK([
+runroot_user rpm -qa --qf "%{nevra} %{dbinstance}\n"
+],
+[0],
+[hello-2.0-1.i686 2
+],
+[])
+
+RPMTEST_CHECK([
 runroot rpmdb --rebuilddb
-runroot ls `rpm -E "%{_dbpath}/.rpm.lock"`
-runroot rpm -qa --qf "%{nevra} %{dbinstance}\n"
-runroot ls `rpm -E "%{_dbpath}/.rpm.lock"`
+],
+[0],
+[],
+[])
+
+RPMTEST_CHECK([
+runroot_user rpm -qa --qf "%{nevra} %{dbinstance}\n"
 ],
 [],
-[hello-1.0-1.i386 1
-hello-2.0-1.i686 2
-/var/lib/rpm-testsuite/.rpm.lock
-hello-2.0-1.i686 1
-/var/lib/rpm-testsuite/.rpm.lock
+[hello-2.0-1.i686 1
 ],
 [])
 RPMTEST_CLEANUP
@@ -587,14 +662,16 @@ RPMTEST_SETUP_RW([rpmdb --rebuilddb and verify empty database])
 AT_KEYWORDS([rpmdb])
 RPMTEST_CHECK([
 RPMDB_RESET
+runroot rpm -E "%{exists:%{_rpmlock_path}} %{exists:%{_keyring_lockpath}}"
 runroot rpmdb --rebuilddb
-runroot ls `rpm -E "%{_dbpath}/.rpm.lock"`
+runroot rpm -E "%{exists:%{_rpmlock_path}} %{exists:%{_keyring_lockpath}}"
 runroot rpmdb --verifydb
-runroot ls `rpm -E "%{_dbpath}/.rpm.lock"`
+runroot rpm -E "%{exists:%{_rpmlock_path}} %{exists:%{_keyring_lockpath}}"
 ],
 [0],
-[/var/lib/rpm-testsuite/.rpm.lock
-/var/lib/rpm-testsuite/.rpm.lock
+[1 1
+0 1
+1 1
 ],
 [])
 RPMTEST_CLEANUP

@@ -1,5 +1,5 @@
 # Supported Fedora releases: 43 44
-FROM registry.fedoraproject.org/fedora:43 AS base
+FROM quay.io/fedora/fedora:43 AS base
 LABEL com.github.containers.toolbox="true"
 MAINTAINER rpm-maint@lists.rpm.org
 
@@ -15,11 +15,10 @@ RUN dnf -y install \
   bubblewrap \
   cmake \
   gettext-devel \
+  daemonize \
   debugedit \
   doxygen \
   make \
-  gcc \
-  gcc-c++ \
   git-core \
   glibc-gconv-extra \
   zlib-devel \
@@ -33,6 +32,9 @@ RUN dnf -y install \
   rpm-sequoia-devel \
   file-devel \
   popt-devel \
+  kryoptic \
+  pkcs11-provider \
+  opensc \
   libarchive-devel \
   sqlite-devel \
   libselinux-devel \
@@ -55,10 +57,9 @@ RUN dnf -y install \
   scdoc \
   scd2html \
   sequoia-sq \
-  libasan \
-  libubsan
+  nss-altfiles
 # If updates to specific packages are needed, do it here
-# RUN dnf -y --enablerepo=updates install ...
+RUN dnf -y --enablerepo=updates install rpm-sequoia-devel-1.10.1
 
 # Install some development tools
 RUN dnf -y install \
@@ -66,6 +67,24 @@ RUN dnf -y install \
     gdb \
     strace \
     valgrind
+
+# Install the requested toolchain
+ARG TOOLCHAIN=gcc
+RUN case "$TOOLCHAIN" in \
+        gcc) \
+            dnf -y install \
+                gcc \
+                gcc-c++ \
+                libasan \
+                libubsan \
+        ;; \
+        clang) \
+            dnf -y install \
+                clang \
+                compiler-rt \
+                libomp-devel \
+        ;; \
+    esac
 
 RUN dnf clean all
 
@@ -83,30 +102,21 @@ RUN ln -sf $(rpm --eval '%{_target_platform}%{?_gnu}')-pkg-config \
 RUN rpm -e --nodeps --nodb \
 	rpm \
 	rpm-libs \
-	rpm-build-libs
+	rpm-sign-libs \
+	rpm-build-libs \
+	rpm-plugin-ima
 
 WORKDIR /
 CMD /bin/bash
 
 FROM base AS full
+ARG TOOLCHAIN=gcc
 
 WORKDIR /srv/rpm
 COPY . .
 
 WORKDIR /srv/build
-ENV CFLAGS="-Og -g"
-ENV CXXFLAGS="-Og -g"
-RUN cmake \
-	-DENABLE_WERROR=ON \
-	-DENABLE_ASAN=ON \
-	-DENABLE_UBSAN=ON \
-	-DENABLE_BDB_RO=ON \
-	-DWITH_FSVERITY=ON \
-	-DWITH_IMAEVM=ON \
-	-DWITH_DOXYGEN=ON \
-	-DENABLE_TESTSUITE=ON \
-	-DMKTREE_BACKEND=rootfs \
-	../rpm
+RUN cmake --preset dev-${TOOLCHAIN} -DMKTREE_BACKEND=rootfs ../rpm
 RUN make -j$(nproc) tree
 
 RUN rm -rf /srv/{rpm,build}

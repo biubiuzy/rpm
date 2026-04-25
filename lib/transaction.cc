@@ -1182,7 +1182,7 @@ struct vfydata_s {
 };
 }
 
-static int sortRC(int rc)
+int sortRC(int rc)
 {
     switch (rc) {
     case RPMRC_OK: return 0;
@@ -1287,7 +1287,7 @@ static int verifyPackage(rpmts ts, rpmte p, struct rpmvs_s *vs, int vfylevel)
     }
 
     if (prc == RPMRC_OK)
-	prc = rpmvsVerify(vs, vfylevel, vfyCb, &vd);
+	prc = rpmvsVerify(vs, RPMSIG_VERIFIABLE_TYPE, vfyCb, &vd);
 
     /* Record verify result */
     if (vd.type[RPMSIG_SIGNATURE_TYPE] == RPMRC_OK)
@@ -1296,8 +1296,11 @@ static int verifyPackage(rpmts ts, rpmte p, struct rpmvs_s *vs, int vfylevel)
 	verified |= RPMSIG_DIGEST_TYPE;
     rpmteSetVerified(p, verified);
 
-    if (prc)
+    if (prc) {
+	if (vd.msg == NULL)
+	    vd.msg = xstrdup(_("no verifiable digest or signature available"));
 	rpmteAddProblem(p, RPMPROB_VERIFY, NULL, vd.msg, 0);
+    }
 
     vd.msg = _free(vd.msg);
     headerFree(auxh);
@@ -1782,6 +1785,7 @@ int rpmtsRun(rpmts ts, rpmps okProbs, rpmprobFilterFlags ignoreSet)
     int nfailed = -1;
     tsMembers tsmem = rpmtsMembers(ts);
     rpmtxn txn = NULL;
+    rpmtxn kxn = NULL;
     rpmps tsprobs = NULL;
     int TsmPreDone = 0; /* TsmPre hook hasn't been called */
     int nelem = rpmtsNElements(ts);
@@ -1800,9 +1804,13 @@ int rpmtsRun(rpmts ts, rpmps okProbs, rpmprobFilterFlags ignoreSet)
 	goto exit;
     }
 
-    /* If we are in test mode, then there's no need for transaction lock. */
+    /* If we are in test mode, then there's no need for locks. */
     if (!(rpmtsFlags(ts) & RPMTRANS_FLAG_TEST)) {
 	if (!(txn = rpmtxnBegin(ts, RPMTXN_WRITE))) {
+	    goto exit;
+	}
+	/* Take a read-lock on the keyring to prevent imports from scripts */
+	if (!(kxn = rpmkxnBegin(ts, RPMTXN_READ))) {
 	    goto exit;
 	}
     }
@@ -1910,6 +1918,7 @@ exit:
     (void) umask(oldmask);
     (void) rpmtsFinish(ts);
     rpmpsFree(tsprobs);
+    rpmtxnEnd(kxn);
     rpmtxnEnd(txn);
     /* Restore SIGPIPE *after* unblocking signals in rpmtxnEnd() */
     sigaction(SIGPIPE, &oact, NULL);

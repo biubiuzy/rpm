@@ -4,6 +4,9 @@
 # inspecting it's output. Everybody else should use a simple noarch
 # package which can be built under runroot in the test-suite.
 
+%bcond hello32 0
+%bcond fileown 0
+
 Summary: hello -- hello, world rpm
  Name: hello
 Version: 1.0
@@ -16,6 +19,11 @@ URL: http://rpm.org
 	Source0: hello-1.0.tar.gz
  Patch0: hello-1.0-modernize.patch
 Prefix: /usr
+
+%if %{with hello32}
+Source1: hello32
+%define debug_package %{nil}
+%endif
 
 %description
 Simple rpm demonstration.
@@ -30,13 +38,20 @@ make
 %install
 mkdir -p $RPM_BUILD_ROOT/usr/local/bin
 make DESTDIR=$RPM_BUILD_ROOT install
+%if %{with hello32}
+cp %{SOURCE1} $RPM_BUILD_ROOT/usr/local/bin/hello
+%endif
 
 %files
 %defattr(-,root,root)
 %doc	FAQ
 #%readme README
 #%license COPYING
+%if %{with fileown}
+%attr(0751,foobar,foobar)	/usr/local/bin/hello
+%else
 %attr(0751,root,root)	/usr/local/bin/hello
+%endif
 
 %changelog
 * Tue Oct 20 1998 Jeff Johnson <jbj@redhat.com>

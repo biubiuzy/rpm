@@ -62,7 +62,8 @@ foreach(at ${TESTSUITE_AT})
 	FILE(APPEND ${CMAKE_CURRENT_BINARY_DIR}/rpmtests.at "m4_include([${at}])\n")
 endforeach()
 
-set(TESTPROGS rpmpgpcheck rpmpgppubkeyfingerprint readpkgnullts rpmdig)
+set(TESTPROGS rpmpgpcheck rpmpgppubkeyfingerprint readpkgnullts rpmdig
+	      importkey oldtxn)
 foreach(prg ${TESTPROGS})
 	add_executable(${prg} EXCLUDE_FROM_ALL ${prg}.c)
 	target_link_libraries(${prg} PRIVATE librpm)
@@ -90,7 +91,9 @@ if (MKTREE_BACKEND STREQUAL oci)
 		set(MKTREE_NATIVE yes)
 		configure_file(${DOCKERFILE} Dockerfile COPYONLY)
 		add_custom_target(ci
-			COMMAND ./mktree.oci build
+			COMMAND ./mktree.oci build --toolchain clang
+			COMMAND ./mktree.oci clean
+			COMMAND ./mktree.oci build --toolchain gcc
 			COMMAND ./mktree.oci check ${JOBS} $(TESTOPTS)
 			COMMAND ./mktree.oci clean
 			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -107,6 +110,15 @@ elseif (MKTREE_BACKEND STREQUAL rootfs)
 endif()
 message(STATUS "Using mktree backend: ${MKTREE_BACKEND} "
 	       "(native: ${MKTREE_NATIVE})")
+
+# Detect the toolchain used
+if (CMAKE_C_COMPILER_ID STREQUAL GNU)
+	set(MKTREE_TOOLCHAIN gcc)
+else()
+	set(MKTREE_TOOLCHAIN ${CMAKE_C_COMPILER_ID})
+	string(TOLOWER ${MKTREE_TOOLCHAIN} MKTREE_TOOLCHAIN)
+endif()
+
 configure_file(mktree.common mktree.common @ONLY)
 configure_file(mktree.${MKTREE_BACKEND} mktree @ONLY)
 configure_file(setup.sh setup.sh @ONLY)

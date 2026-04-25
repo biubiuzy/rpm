@@ -5,9 +5,9 @@ rpm-macros - RPM macro processor
 
 # SYNOPSIS
 ## Defining
-*%*_NAME_ _BODY_
+*%*_NAME_[*<*_MODIFIERS_*>*] _BODY_
 
-*%*_NAME_*(*[_OPTIONS_]*)* _BODY_
+*%*_NAME_*(*[_OPTIONS_]*)*[*<*_MODIFIERS_*>*] _BODY_
 
 ## Expanding
 *%*_NAME_
@@ -55,8 +55,25 @@ The syntax for defining simple macros is:
 
 All whitespace surrounding _BODY_ is removed.  _NAME_ may be composed
 of alphanumeric characters and the underscore (*\_*), and must be at least
-two characters in length. The body is (re-)expanded on each macro invocation.
-Macro names and options are case-sensitive.
+two characters in length. By default, the body is (re-)expanded on each
+macro invocation. Macro names and options are case-sensitive.
+
+Macro behavior can be altered by supplying modifiers: (Added: 6.1.0)
+
+	_NAME_*<*_MODIFIERS_*>* _BODY_
+
+Supported modifiers are:
+- *l*: Literal expansion. *%* is not processed when expanding.
+- *o*: One-shot expansion. The macro is expanded on first use and the
+  literal result is pushed on top of the original macro.
+
+Literal macros can simplify dealing with content that may contain
+percent signs (*%*) which otherwise would need to be escaped.
+
+One-shot macros are useful for caching expansion results, for example to
+guard a result against underlying changes, or to perform an expensive
+shell invocation just once.
+The one-shot expansion can be re-armed by undefining the macro once.
 
 See *PARAMETRIC MACROS* for the more advanced macro variant with options
 and arguments processing.
@@ -68,10 +85,10 @@ described in *rpm-common*(8) and the API (C, Python, Lua).
 Except for those defined inside parametric macros, macros are always global
 in scope.
 
-RPM macros are stacked, ie. when redefining an already existing
-macro, it shadows the previous definition instead of replacing it, and
-undefining a macro only pops the topmost definition, thus activating
-the previous macro definition.
+RPM macros are stacked, ie. when redefining an already existing macro,
+the new definition is pushed on top of the previous one, shadowing it.
+Conversely, undefining a macro only pops the topmost definition,
+reactivating the previous macro definition if there is one.
 
 Note that this manual only describes the macro processor engine itself.
 On a normal RPM based system, there are a vast number of other macros
@@ -209,7 +226,7 @@ arguments, much like common shell tools.
 
 The syntax for defining parametric macros is:
 
-	_NAME_([_OPTIONS_]) _BODY_
+	_NAME_*(*[_OPTIONS_]*)*[*<*_MODIFIERS_*>*] _BODY_
 
 If present, the _OPTIONS_ (i.e. the string between parentheses) are passed
 exactly as is to *getopt*(3) for argc/argv processing at the beginning of
@@ -219,6 +236,9 @@ a macro invocation. Only short options are supported.
 This allows macros to fully decide how to handle their input, e.g.
 if the arguments of the macro only/mostly consist of items starting
 with *-*, the default processing only gets in the way.
+
+A modifier field may be present, but currently there are no modifiers
+compatible with parametric macros.
 
 ## Automatic macros
 While a parameterized macro is being expanded, the following shell-like
@@ -282,8 +302,11 @@ callee(s).
 
 To define a global macro inside a parametric macro, you _must_ use *%global*
 instead of *%define*. Also note that because such a macro may be referring
-to other macros only visible in the current scope, *%global* _expands the
-macro body once at the time of definition_.
+to other macros only visible in the current scope, *%global* expands the
+macro body once at the time of definition, unless it's a *l*iteral macro.
+Note that the body of a *o*ne-shot macro defined via *%global* is actually
+expanded twice: once at the time of definition, and the result of that
+expansion is expanded again on first use.
 
 ## Calling convention
 When a parametric macro is expanded, the following calling convention is used:
@@ -555,8 +578,11 @@ the preceding *%*-character.
 	```
 
 *%{uncompress:*_PATH_*}*
-	Expand to a command for outputting argument _PATH_ to stdout,
+	Expand to a command for outputting argument _PATH_ to standard output,
 	uncompressing as needed.
+
+	Note: for unpackaging sources in *rpm-spec*(5) files, consider
+	calling *rpmuncompress*(1) directly instead.
 
 	Example:
 	```
@@ -613,7 +639,7 @@ the preceding *%*-character.
 
 ## Output
 *%{echo:*_STRING_*}*
-	Print _STRING_ to process stdout.
+	Print _STRING_ to process standard output.
 
 	Example:
 	```
@@ -621,7 +647,7 @@ the preceding *%*-character.
 	```
 
 *%{warn:*_STRING_*}*
-	Print _STRING_ prefixed with "warning: " to process stderr.
+	Print _STRING_ prefixed with "warning: " to process standard error.
 
 	Example:
 	```
@@ -629,7 +655,7 @@ the preceding *%*-character.
 	```
 
 *%{error:*_STRING_*}*
-	Print _STRING_ prefixed with "error: " to process stderr and
+	Print _STRING_ prefixed with "error: " to process standard error and
 	flag an error in the macro processor.
 
 	Example:
@@ -737,6 +763,39 @@ Expands to *1* if *%aa* expands to *5*, otherwise expands to *2*:
 ```
 %[ "%{aa}" == "5" ? 1 : 2]
 ```
+
+## Example 7. Literal macros
+
+Define a macro whose body contains literal *%* characters, possibly
+overlapping with other macros:
+
+```
+%mymacro 1.2.3
+%aa %mymacro
+%bb<l> %mymacro
+```
+
+*%aa* expands to *1.2.3*, whereas *%bb* expands to *%mymacro*.
+
+```
+%cc some%%thing
+%dd<l> some%%thing
+```
+
+*%cc* expands to *some%thing*, whereas *%dd* expands to *some%%thing*.
+
+## Example 8. One-shot macros
+
+Define a one-shot *\_python_platlib* macro to output Python platform
+library path:
+
+```
+%_python_platlib<o> %(python -c "import sysconfig; print(sysconfig.get_path('platlib'))")
+```
+
+The Python interpreter will only be invoked on the first use of this macro,
+the result of that expansion is pushed as a literal macro on top of the
+original.
 
 # DEBUGGING
 Some useful tools for working with and troubleshooting macros:

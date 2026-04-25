@@ -22,6 +22,7 @@
 %__7zip			@__7ZIP@
 %__awk			@__AWK@
 %__bzip2		@__BZIP2@
+%__car			@__CAR@
 %__cat			@__CAT@
 %__chmod		@__CHMOD@
 %__chown		@__CHOWN@
@@ -64,7 +65,7 @@
 %__ld			@__LD@
 %__objdump		@__OBJDUMP@
 %__strip		@__STRIP@
-%__rpmuncompress	%{_rpmconfigdir}/rpmuncompress
+%__rpmuncompress	@bindir_full@/rpmuncompress
 
 %__find_debuginfo	@__FIND_DEBUGINFO@
 
@@ -130,9 +131,12 @@
 
 %_keyringpath		%{_dbpath}/pubkeys/
 
+%_keyring_lockpath	%{_dbpath}/.keyring.lock
+
 # Location of passwd(5) and group(5), as : separated list
-%_passwd_path		/etc/passwd
-%_group_path		/etc/group
+# Uncomment to disable NSS lookups
+#%_passwd_path		/etc/passwd
+#%_group_path		/etc/group
 
 # location of sysusers.d(5) directory
 %_sysusersdir		@sysusersdir@
@@ -637,10 +641,9 @@ Supplements:   (%{name} = %{version}-%{release} and langpacks-%{1})\
 #	Macro(s) used to parameterize transactions.
 #
 #	The output binary package file name template used when building
-#	binary packages, as described by rpm-queryformat(7). Percent signs need
-#	to be escaped.
+#	binary packages, as described by rpm-queryformat(7).
 #
-%_build_name_fmt	%%{ARCH}/%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm
+%_build_name_fmt<l>	%{ARCH}/%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}.rpm
 
 #	Verify digest/signature flags for various rpm modes:
 #	0x30300 (RPMVSF_MASK_NODIGESTS)    --nohdrchk      if set, don't check digest(s)
@@ -713,8 +716,8 @@ Supplements:   (%{name} = %{version}-%{release} and langpacks-%{1})\
 
 #
 # Default output format for query operations, as described by
-# rpm-queryformat(7). Percent signs need to be escaped.
-%_query_all_fmt		%%{nvr}%%{archsuffix}
+# rpm-queryformat(7).
+%_query_all_fmt<l>		%{nvr}%{archsuffix}
 
 #
 # Default for coloring output

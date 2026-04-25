@@ -36,7 +36,7 @@ RPMPY_TEST([basic rpmio],[
 msg = b'Killroy was here\n'
 data = msg * 10
 # TODO: test other compression types too if built in
-for iot in [ 'fpio', 'fdio', 'ufdio', 'gzdio' ]:
+for iot in [ 'fdio', 'ufdio', 'gzdio' ]:
     fn = 'pyio.%s' % iot
     fd = rpm.fd(fn, 'w', iot)
     pos = fd.tell()
@@ -66,6 +66,26 @@ for iot in [ 'fpio', 'fdio', 'ufdio', 'gzdio' ]:
         print('%s sized read fail (got %d bytes)\n%s' % (iot, len(rdata), rdata))
 ],
 [])
+
+RPMPY_TEST([rpm.fd engine validation],[
+try:
+    engine = 'fdio'
+    f = rpm.fd('/etc/passwd', 'r', engine)
+    print('rpm.fd %s: accepted' % engine)
+    f.close()
+except OSError as e:
+    print('rpm.fd %s: %s' % (engine, e))
+
+for args in [('r', 'aaaiiiooo'), ('r9xyz', '')]:
+    try:
+        rpm.fd('/etc/passwd', *args)
+    except OSError as e:
+        print('rpm.fd%r: %s' % (args, e))
+],
+[rpm.fd fdio: accepted
+rpm.fd('r', 'aaaiiiooo'): Invalid argument
+rpm.fd('r9xyz', ''): Invalid argument
+])
 
 RPMPY_TEST([spec parse 1],[
 # TODO: add a better test spec with sub-packages etc
@@ -451,9 +471,40 @@ RPMTEST_CHECK([
 runroot rpm -i \
   --justdb --nodeps --ignorearch --ignoreos --nosignature \
   /data/RPMS/foo-1.0-1.noarch.rpm \
-  /data/RPMS/hello-2.0-1.i686.rpm
+  /data/RPMS/hello-2.0-1.i686.rpm \
+  /data/RPMS/hlinktest-1.0-1.noarch.rpm \
+  /data/RPMS/imatest-1.0-1.fc34.noarch.rpm
 ],
 [0],
+[],
+[])
+
+RPMPY_CHECK([
+mi = ts.dbMatch()
+mi.pattern('filenames', rpm.RPMMIRE_STRCMP, '/foo/hello-world')
+for h in mi:
+    print(h['nevra'])
+],
+[hlinktest-1.0-1.noarch
+],
+[])
+
+RPMPY_CHECK([
+mi = ts.dbMatch()
+mi.pattern('filenames', rpm.RPMMIRE_GLOB, '/usr/share/*1')
+for h in mi:
+    print(h['nevra'])
+],
+[test-1.0-1.fc34.noarch
+],
+[])
+
+RPMPY_CHECK([
+mi = ts.dbMatch()
+mi.pattern('filenames', rpm.RPMMIRE_REGEX, '/usr/share/*1')
+for h in mi:
+    print(h['nevra'])
+],
 [],
 [])
 
@@ -483,11 +534,50 @@ for h in mi:
 [])
 
 RPMPY_CHECK([
+mi = ts.dbMatch()
+mi.pattern('basenames', rpm.RPMMIRE_STRCMP, 'hello')
+for h in mi:
+    print(h['nevra'])
+],
+[hlinktest-1.0-1.noarch
+hello-2.0-1.i686
+],
+[])
+
+# multiple patterns on the same tag are OR'ed
+RPMPY_CHECK([
+mi = ts.dbMatch()
+mi.pattern('basenames', rpm.RPMMIRE_STRCMP, 'example1')
+mi.pattern('basenames', rpm.RPMMIRE_STRCMP, 'zzzz')
+mi.pattern('basenames', rpm.RPMMIRE_STRCMP, 'notthere')
+for h in mi:
+    print(h['nevra'])
+],
+[test-1.0-1.fc34.noarch
+hlinktest-1.0-1.noarch
+],
+[])
+
+# multiple different tag patterns are AND'ed
+RPMPY_CHECK([
+mi = ts.dbMatch()
+mi.pattern('basenames', rpm.RPMMIRE_STRCMP, 'hello')
+mi.pattern('arch', rpm.RPMMIRE_STRCMP, 'noarch')
+for h in mi:
+    print(h['nevra'])
+],
+[hlinktest-1.0-1.noarch
+],
+[])
+
+RPMPY_CHECK([
 for h in ts.dbMatch('name'):
     print(h['nevra'])
 ],
 [foo-1.0-1.noarch
 hello-2.0-1.i686
+hlinktest-1.0-1.noarch
+test-1.0-1.fc34.noarch
 ],
 [])
 
@@ -526,10 +616,13 @@ RPMPY_CHECK([
 for di in sorted(ts.dbIndex('provides')):
     print(di)
 ],
-[foo
+[/bin/sh
+foo
 hello
 hello(x86-32)
 hi
+hlinktest
+test
 ],
 [])
 RPMTEST_CLEANUP

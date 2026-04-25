@@ -88,6 +88,14 @@ rpm --eval '%{not_defined}'
 [%{not_defined}
 ],
 [])
+
+RPMTEST_CHECK([
+rpm --define 'foo { bar }' --eval '>%{foo}<'
+],
+[0],
+[> bar <
+],
+[])
 RPMTEST_CLEANUP
 
 # ------------------------------
@@ -128,6 +136,14 @@ rpm --eval '1. %{this}' --define "this that" --eval '2. %{this}' --undefine 'thi
 1. %{this}
 2. that
 3. %{this}
+])
+
+RPMTEST_CHECK([
+rpm --undefine getenv
+],
+[1],
+[],
+[error: Macro %getenv is a built-in (%undefine)
 ])
 RPMTEST_CLEANUP
 
@@ -359,7 +375,7 @@ RPMTEST_CLEANUP
 RPMTEST_SETUP([uncompress 1])
 AT_KEYWORDS([macros])
 RPMTEST_CHECK([
-${RPM_CONFIGDIR_PATH}/rpmuncompress /data/SOURCES/hello-2.0.tar.gz | tar t
+rpmuncompress /data/SOURCES/hello-2.0.tar.gz | tar t
 ],
 [0],
 [hello-2.0/
@@ -376,7 +392,7 @@ RPMTEST_SETUP([uncompress 2])
 AT_KEYWORDS([macros])
 RPMTEST_CHECK([
 echo xxxxxxxxxxxxxxxxxxxxxxxxx > "some%%ath"
-${RPM_CONFIGDIR_PATH}/rpmuncompress "some%%ath"
+rpmuncompress "some%%ath"
 ],
 [0],
 [xxxxxxxxxxxxxxxxxxxxxxxxx
@@ -387,13 +403,13 @@ RPMTEST_SETUP([uncompress 3])
 AT_KEYWORDS([macros rpmuncompress])
 
 RPMTEST_CHECK([
-${RPM_CONFIGDIR_PATH}/rpmuncompress -x -C test-1.2.3 /data/SOURCES/test-1.2.3.zip
+rpmuncompress -x -C test-1.2.3 /data/SOURCES/test-1.2.3.zip
 ],
 [0],
 [])
 
 RPMTEST_CHECK([
-${RPM_CONFIGDIR_PATH}/rpmuncompress -x -C test-1.2.3-7 /data/SOURCES/test-1.2.3.7z
+rpmuncompress -x -C test-1.2.3-7 /data/SOURCES/test-1.2.3.7z
 ],
 [0],
 [])
@@ -426,8 +442,8 @@ AT_KEYWORDS([macros rpmuncompress])
 
 RPMTEST_CHECK([
 runroot mkdir -p /tmp/1
-runroot --chdir /tmp/1 ${RPM_CONFIGDIR_PATH}/rpmuncompress -x /data/SOURCES/test-1.2.3.zip
-runroot --chdir /tmp/1 ${RPM_CONFIGDIR_PATH}/rpmuncompress -x /data/SOURCES/test-1.2.3.zip
+runroot --chdir /tmp/1 rpmuncompress -x /data/SOURCES/test-1.2.3.zip
+runroot --chdir /tmp/1 rpmuncompress -x /data/SOURCES/test-1.2.3.zip
 ],
 [0],
 [],
@@ -448,8 +464,8 @@ runroot --chdir /tmp/1 find . | sort
 
 RPMTEST_CHECK([
 runroot mkdir -p /tmp/2
-runroot --chdir /tmp/2 ${RPM_CONFIGDIR_PATH}/rpmuncompress -x /data/SOURCES/test-1.2.3.7z
-runroot --chdir /tmp/2 ${RPM_CONFIGDIR_PATH}/rpmuncompress -x /data/SOURCES/test-1.2.3.7z
+runroot --chdir /tmp/2 rpmuncompress -x /data/SOURCES/test-1.2.3.7z
+runroot --chdir /tmp/2 rpmuncompress -x /data/SOURCES/test-1.2.3.7z
 ],
 [0],
 [],
@@ -467,6 +483,22 @@ runroot --chdir /tmp/2 find . | sort
 ./test-1.2.3-beta/src/README.txt
 ],
 [ignore])
+
+RPMTEST_CHECK([
+runroot rpmuncompress --dry-run /data/SOURCES/test-1.2.3.car
+],
+[0],
+[ignore],
+[/usr/bin/car extract -f /data/SOURCES/test-1.2.3.car
+])
+
+RPMTEST_CHECK([
+runroot rpmuncompress --dry-run /data/SOURCES/test-1.2.3.carv2
+],
+[0],
+[ignore],
+[/usr/bin/car extract -f /data/SOURCES/test-1.2.3.carv2
+])
 RPMTEST_CLEANUP
 
 RPMTEST_SETUP_RW([getncpus macro])
@@ -1094,6 +1126,15 @@ rpm --eval '%{lua: rpm.define("foo bar") print(rpm.expand("%{foo}"))}'
 [0],
 [bar
 ])
+
+RPMTEST_CHECK([
+rpm --eval '%{lua: rpm.undefine("define")}'
+],
+[1],
+[],
+[[error: Macro %define is a built-in (%undefine)
+error: lua script failed: [string "<lua>"]:1: error undefining macro
+]])
 RPMTEST_CLEANUP
 
 RPMTEST_SETUP([lua rpm extensions 2])
@@ -1548,6 +1589,140 @@ done
 xxx
 error: bad
 ])
+RPMTEST_CLEANUP
+
+RPMTEST_SETUP([macro modifiers])
+AT_KEYWORDS([macros])
+RPMTEST_CHECK([
+rpm --define "aa 123" --define "mymod %aa" --eval "%mymod"
+],
+[0],
+[123
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --define "mymod<> %aa" --eval "%mymod"
+],
+[0],
+[123
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --define "mymod<l> %aa" --eval "%mymod"
+],
+[0],
+[%aa
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --define "mymod<> %aa" --eval "%mymod" \
+    --define "aa 321" --eval "%mymod"
+],
+[0],
+[123
+321
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --define "mymod<o> %aa" --eval "%mymod" \
+    --define "aa 321" --eval "%mymod" \
+    --undefine "mymod" --define "aa 987" --eval "%mymod"
+],
+[0],
+[123
+123
+987
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --eval "%global mymod %aa" --eval "%mymod"
+],
+[0],
+[123
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --eval "%global mymod<l> %aa" --eval "%mymod"
+],
+[0],
+[%aa
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --eval "%global mymod<o> %aa%bb" \
+    --define "aa 321" --define "bb 987" \
+    --eval "%mymod" \
+    --undefine "aa" --undefine "bb" \
+    --eval "%mymod"
+],
+[0],
+[123987
+123987
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --define "mymod<lz> %aa" --eval "%mymod"
+],
+[1],
+[],
+[error: Macro %mymod has illegal modifier z
+])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --define "mymod()<> %aa" --eval "%mymod"
+],
+[0],
+[123
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --define "mymod()<l> %aa" --eval "%mymod"
+],
+[1],
+[],
+[error: Macro %mymod has modifiers incompatible with parametric macros
+])
+
+RPMTEST_CHECK([
+rpm --define "aa 123" --define "mymod<lo> %aa" --eval "%mymod"
+],
+[1],
+[],
+[error: Macro %mymod has incompatible modifiers
+])
+
+RPMTEST_CHECK([
+rpm --define "mylit<l> %%%%" --showrc | grep ' mylit' | awk '{print $2}'
+],
+[0],
+[mylit<l>
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "myonce<o> %(date)" --showrc | grep ' myonce' | awk '{print $2}'
+],
+[0],
+[myonce<o>
+],
+[])
+
+RPMTEST_CHECK([
+rpm --define "myonce<o> %(date)" --eval "%myonce" --showrc | grep ' myonce' | awk '{print $2}'
+],
+[0],
+[myonce<l>
+],
+[])
 RPMTEST_CLEANUP
 
 RPMTEST_SETUP([error macro return])
