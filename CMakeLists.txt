@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 project(rpm
-	VERSION 6.0.90
+	VERSION 6.1.90
 	DESCRIPTION "The RPM Package Manager"
 	HOMEPAGE_URL "http://rpm.org"
 	LANGUAGES C CXX
@@ -52,7 +52,7 @@ set(RPM_VENDOR "vendor" CACHE STRING "rpm vendor string")
 # - incrementing a more significant version segment resets changes to
 #   any less significant segments
 set(RPM_SOVERSION 10)
-set(RPM_LIBVERSION ${RPM_SOVERSION}.6.0)
+set(RPM_LIBVERSION ${RPM_SOVERSION}.8.0)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -490,6 +490,14 @@ install(DIRECTORY DESTINATION ${RPM_CONFIGDIR}/lua)
 install(DIRECTORY DESTINATION ${RPM_CONFIGDIR}/macros.d)
 install(DIRECTORY DESTINATION ${CMAKE_INSTALL_FULL_SYSCONFDIR}/rpm)
 install(FILES CONTRIBUTING.md COPYING CREDITS INSTALL README TYPE DOC)
+
+# Compat links for commands that moved from /usr/lib/rpm to bin
+foreach(cmd rpmuncompress rpm-setup-autosign)
+	install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} \
+		-E create_symlink \
+			../../${CMAKE_INSTALL_BINDIR}/${cmd} \
+			\$ENV{DESTDIR}/${RPM_CONFIGDIR}/${cmd})")
+endforeach()
 
 add_custom_target(ChangeLog
 		   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}

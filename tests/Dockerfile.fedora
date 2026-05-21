@@ -1,5 +1,5 @@
 # Supported Fedora releases: 43 44
-FROM quay.io/fedora/fedora:43 AS base
+FROM quay.io/fedora/fedora:44 AS base
 LABEL com.github.containers.toolbox="true"
 MAINTAINER rpm-maint@lists.rpm.org
 
@@ -48,7 +48,7 @@ RUN dnf -y install \
   which \
   elfutils binutils \
   findutils sed grep gawk diffutils file patch \
-  tar unzip gzip bzip2 cpio xz p7zip \
+  tar unzip gzip bzip2 cpio xz 7zip 7zip-standalone \
   pkgconfig \
   /usr/bin/systemd-sysusers \
   gdb-headless \
@@ -59,7 +59,7 @@ RUN dnf -y install \
   sequoia-sq \
   nss-altfiles
 # If updates to specific packages are needed, do it here
-RUN dnf -y --enablerepo=updates install rpm-sequoia-devel-1.10.1
+RUN dnf -y --enablerepo=updates install "rpm-sequoia-devel >= 1.10.2"
 
 # Install some development tools
 RUN dnf -y install \
@@ -97,6 +97,9 @@ RUN chmod +x /usr/local/bin/podman
 # This is needed for cmake to work without an rpm installation.
 RUN ln -sf $(rpm --eval '%{_target_platform}%{?_gnu}')-pkg-config \
            /usr/bin/pkg-config
+# Workaround for nss-altfiles overriding %_passwd_path and %_group_path
+# https://bugzilla.redhat.com/show_bug.cgi?id=2476417
+RUN rm -f /usr/lib/rpm/macros.d/macros.altfiles
 
 # Self-destruct stock rpm
 RUN rpm -e --nodeps --nodb \
