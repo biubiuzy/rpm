@@ -679,7 +679,6 @@ RPMTEST_CLEANUP
 RPMTEST_SETUP_RW([rpmbuild with %autosetup -C])
 AT_KEYWORDS([build])
 RPMTEST_CHECK([
-
 rpmbuild \
   -bp ${RPMDATA}/SPECS/autosetup-noroot.spec
 ],
@@ -688,7 +687,14 @@ rpmbuild \
 [ignore])
 
 RPMTEST_CHECK([
+rpmbuild \
+  -bp ${RPMDATA}/SPECS/autosetup-noroot-nodir.spec
+],
+[0],
+[ignore],
+[ignore])
 
+RPMTEST_CHECK([
 rpmbuild \
   -bp ${RPMDATA}/SPECS/autosetup-singleroot.spec
 ],
@@ -709,6 +715,23 @@ rpmbuild \
   -bp ${RPMDATA}/SPECS/autosetup-singleroot2.spec
 ],
 [0],
+[ignore],
+[ignore])
+
+RPMTEST_CHECK([
+rpmbuild \
+  -bp ${RPMDATA}/SPECS/autosetup-singleroot-noslash.spec
+],
+[0],
+[ignore],
+[ignore])
+
+RPMTEST_CHECK([
+rpmbuild \
+  -bp --quiet ${RPMDATA}/SPECS/autosetup-singleroot-evil.spec
+test -f $RPMTEST/build/BUILD/*/beenhere
+],
+[1],
 [ignore],
 [ignore])
 RPMTEST_CLEANUP

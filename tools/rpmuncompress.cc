@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <filesystem>
 #include <string>
 
 #include <archive.h>
@@ -16,6 +17,8 @@
 #include <rpm/rpmstring.h>
 
 #include "debug.h"
+
+namespace fs = std::filesystem;
 
 static int extract = 0;
 static int dryrun = 0;
@@ -100,17 +103,18 @@ static char *doUncompress(const char *fn)
  * Detect if an archive has a single top level entry, and it's a directory.
  *
  * @param path	path of the archive
- * @return	only top level directory (if any),
- * 		NULL if it contains multiple top level entries or a single file
- * 		or on archive error
+ * @return	1 if the archive has a single top level, directory entry,
+ * 		0 otherwise,
+ * 		-1 on archive error
  */
-static char * singleRoot(const char *path)
+static int singleRoot(const char *path)
 {
 	struct archive *a;
 	struct archive_entry *entry;
 	int r, ret = -1, rootLen;
+	const char *p = NULL;
+	const char *sep = NULL;
 	char *rootName = NULL;
-	char *sep = NULL;
 
 	a = archive_read_new();
 	archive_read_support_filter_all(a);
@@ -122,35 +126,40 @@ static char * singleRoot(const char *path)
 	if (archive_read_next_header(a, &entry) != ARCHIVE_OK) {
 	    goto afree;
 	}
-	rootName = xstrdup(archive_entry_pathname(entry));
-	sep = strchr(rootName, '/');
-	if (sep == NULL) {
+
+	/* Extract the lead directory from the first entry */
+	p = archive_entry_pathname(entry);
+	sep = strchr(p, '/');
+	if (sep) {
+	    rootName = xstrdup(p);
+	    rootLen = sep - p + 1;
+	} else if (archive_entry_filetype(entry) == AE_IFDIR) {
+	    rootName = rstrscat(NULL, p, "/", NULL);
+	    rootLen = strlen(rootName);
+	} else {
 	    /* No directories in the pathname */
 	    ret = 0;
 	    goto afree;
 	}
 
 	/* Do all entries in the archive start with the same lead directory? */
-	rootLen = sep - rootName + 1;
 	while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
-	    const char *p = archive_entry_pathname(entry);
+	    p = archive_entry_pathname(entry);
 	    if (strncmp(rootName, p, rootLen)) {
 		ret = 0;
 		goto afree;
 	    }
 	}
-	*sep = '\0';
+
 	ret = 1;
 
 afree:
+	free(rootName);
 	r = archive_read_free(a);
 	if (r != ARCHIVE_OK)
 	    ret = -1;
 
-	if (ret != 1)
-	    rootName = _free(rootName);
-
-	return rootName;
+	return ret;
 }
 
 static char *doUntar(const char *fn)
@@ -169,7 +178,7 @@ static char *doUntar(const char *fn)
     needtar = (at->extractable == 0);
 
     if (dstpath) {
-	char * sr = singleRoot(fn);
+	int sr = singleRoot(fn);
 
 	/* if the archive has multiple entries, just extract it into the
 	 * specified destination path, otherwise also strip the first path
@@ -188,8 +197,8 @@ static char *doUntar(const char *fn)
 		rasprintf(
 		    &moveup,
 		    " && "
-		    "(shopt -s dotglob; mv \"$tmp\"/'%s'/* '%s') && "
-		    "rmdir \"$tmp\"/'%s' \"$tmp\" ", sr, dstpath, sr);
+		    "(shopt -s dotglob; mv \"$tmp\"/*/* '%s') && "
+		    "rmdir \"$tmp\"/* \"$tmp\" ", dstpath);
 		rasprintf(&stripcd, "%s\"$tmp\" %s", at->dest, moveup);
 		free(moveup);
 	    } else {
@@ -197,7 +206,6 @@ static char *doUntar(const char *fn)
 		rasprintf(&stripcd, "%s'%s'", at->dest, dstpath);
 	    }
 	}
-	free(sr);
     } else {
 	mkdir = xstrdup("");
 	stripcd = xstrdup("");
@@ -212,21 +220,13 @@ static char *doUntar(const char *fn)
 	if (needtar) {
 	    rasprintf(&buf, "%s %s '%s' | %s %s - %s", mkdir, zipper, fn, tar, taropts, stripcd);
 	} else if (at->compressed == COMPRESSED_GEM) {
-	    char *tmp = xstrdup(fn);
-	    const char *bn = basename(tmp);
-	    size_t nvlen = strlen(bn) - 3;
+	    auto bn = fs::path(fn).stem();
 	    char *gem = rpmGetPath("%{__gem}", NULL);
-	    char *gemspec = NULL;
-	    std::string gemnameversion(bn, nvlen);
 
-	    gemspec = rpmGetPath("", gemnameversion.c_str(), ".gemspec", NULL);
+	    rasprintf(&buf, "%s '%s' && %s spec '%s' --ruby > '%s.gemspec'",
+			zipper, fn, gem, fn, bn.c_str());
 
-	    rasprintf(&buf, "%s '%s' && %s spec '%s' --ruby > '%s'",
-			zipper, fn, gem, fn, gemspec);
-
-	    free(gemspec);
 	    free(gem);
-	    free(tmp);
 	} else {
 	    rasprintf(&buf, "%s%s '%s' %s", mkdir, zipper, fn, stripcd);
 	}

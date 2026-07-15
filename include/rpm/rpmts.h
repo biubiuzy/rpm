@@ -57,7 +57,7 @@ enum rpmtransFlags_e {
     /* bit 28 unused */
     RPMTRANS_FLAG_NOARTIFACTS	= (1 << 29),	/*!< from --noartifacts */
     RPMTRANS_FLAG_NOCONFIGS	= (1 << 30),	/*!< from --noconfigs */
-    RPMTRANS_FLAG_DEPLOOPS	= (1 << 31)	/*!< from --deploops */
+    RPMTRANS_FLAG_DEPLOOPS	= (1U << 31)	/*!< from --deploops */
 };
 
 typedef rpmFlags rpmtransFlags;
@@ -324,6 +324,13 @@ int rpmtsSetDBMode(rpmts ts, int dbmode);
  * @return		0 on success
  */
 int rpmtsRebuildDB(rpmts ts);
+
+/** \ingroup rpmts
+ * Park the database used by the transaction.
+ * @param ts		transaction set
+ * @return		0 on success
+ */
+int rpmtsParkDB(rpmts ts);
 
 /** \ingroup rpmts
  * Verify the database used by the transaction.

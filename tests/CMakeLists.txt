@@ -84,10 +84,22 @@ if (MKTREE_BACKEND STREQUAL oci)
 	find_program(PODMAN podman)
 	find_program(DOCKER docker)
 	mark_as_advanced(PODMAN DOCKER)
+
+	# Find a Dockerfile compatible with the host
 	os_release(OS_NAME ID)
 	os_release(OS_VERSION VERSION_ID)
 	set(DOCKERFILE ${CMAKE_CURRENT_SOURCE_DIR}/Dockerfile.${OS_NAME})
-	if (PODMAN AND EXISTS ${DOCKERFILE})
+	set(DOCKERFILE_FOUND FALSE)
+	if (EXISTS ${DOCKERFILE})
+		file(STRINGS ${DOCKERFILE} DOCKERFILE_FROM LIMIT_COUNT 1)
+		string(REGEX REPLACE "^FROM .+/${OS_NAME}:([0-9]+) AS base$"
+			"\\1" DOCKERFILE_OS_VERSION "${DOCKERFILE_FROM}")
+		if (OS_VERSION STREQUAL DOCKERFILE_OS_VERSION)
+			set(DOCKERFILE_FOUND TRUE)
+		endif()
+	endif()
+
+	if (PODMAN AND DOCKERFILE_FOUND)
 		set(MKTREE_NATIVE yes)
 		configure_file(${DOCKERFILE} Dockerfile COPYONLY)
 		add_custom_target(ci
@@ -102,6 +114,7 @@ if (MKTREE_BACKEND STREQUAL oci)
 		set(MKTREE_NATIVE no)
 		configure_file(Dockerfile Dockerfile COPYONLY)
 	endif()
+
 	find_program(PODMAN NAMES podman docker REQUIRED)
 elseif (MKTREE_BACKEND STREQUAL rootfs)
 	set(MKTREE_NATIVE yes)

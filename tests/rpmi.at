@@ -1781,6 +1781,28 @@ runroot rpm -V ${VERIFYOPTS} deptest-user
 [])
 RPMTEST_CLEANUP
 
+RPMTEST_SETUP_RW([rpm -i create group membership])
+AT_KEYWORDS([install sysusers])
+RPMTEST_CHECK([
+
+runroot rpmbuild -bb --quiet --define "pkg user" --define "provs %{add_sysuser m myuser mygroup}"\
+  /data/SPECS/deptest.spec
+echo Requires
+runroot rpm -q --requires /build/RPMS/noarch/deptest-user-1.0-1.noarch.rpm | grep -E "user|group"
+echo Provides
+runroot rpm -q --provides /build/RPMS/noarch/deptest-user-1.0-1.noarch.rpm | grep -E "user|group"
+],
+[0],
+[Requires
+group(mygroup)
+user(myuser)
+Provides
+deptest-user = 1.0-1
+groupmember(myuser/mygroup) = bSBteXVzZXIgbXlncm91cAAA
+],
+[])
+RPMTEST_CLEANUP
+
 RPMTEST_SETUP_RW([rpm -i sysusers])
 AT_KEYWORDS([install build sysusers])
 
@@ -2157,4 +2179,81 @@ runroot rpm -U --nosignature /data/RPMS/mwe-rpm-lua-problem-1.0.0-1.noarch.rpm
 [Hello World from preinstall lua scriptlet!
 ],
 [])
+RPMTEST_CLEANUP
+
+RPMTEST_SETUP_RW([syslog plugin])
+AT_KEYWORDS([install plugin])
+runroot rpmbuild -bb \
+	--define "myname aaa" --define "myver 1.2" --define "myrel 1" \
+	/data/SPECS/logtest.spec
+runroot rpmbuild -bb \
+	--define "myname aaa" --define "myver 2.0" --define "myrel 1" \
+	/data/SPECS/logtest.spec
+runroot rpmbuild -bb \
+	--define "myname bbb" --define "myver 1.3" --define "myrel 5" \
+	--define "mydep Obsoletes: aaa <= 2.0" \
+	/data/SPECS/logtest.spec
+
+RPMTEST_CHECK([
+runroot --setenv SOURCE_DATE_EPOCH 1 \
+	rpm -U --define "%__transaction_syslog_target stderr" \
+		/build/RPMS/noarch/aaa-1.2-1.noarch.rpm
+],
+[0],
+[],
+[Transaction ID 1 started
+install: aaa-1.2-1.noarch: success
+Transaction ID 1 finished: 0
+])
+
+RPMTEST_CHECK([
+runroot --setenv SOURCE_DATE_EPOCH 2 \
+	rpm -U --define "%__transaction_syslog_target stderr" \
+		/build/RPMS/noarch/aaa-2.0-1.noarch.rpm
+],
+[0],
+[],
+[Transaction ID 2 started
+upgrade: aaa-2.0-1.noarch (from: aaa-1.2-1.noarch): success
+cleanup: aaa-1.2-1.noarch (from: aaa-2.0-1.noarch): success
+Transaction ID 2 finished: 0
+])
+
+RPMTEST_CHECK([
+runroot --setenv SOURCE_DATE_EPOCH 2 \
+	rpm -U --oldpackage --define "%__transaction_syslog_target stderr" \
+		/build/RPMS/noarch/aaa-1.2-1.noarch.rpm
+],
+[0],
+[],
+[Transaction ID 2 started
+downgrade: aaa-1.2-1.noarch (from: aaa-2.0-1.noarch): success
+cleanup: aaa-2.0-1.noarch (from: aaa-1.2-1.noarch): success
+Transaction ID 2 finished: 0
+])
+
+RPMTEST_CHECK([
+runroot --setenv SOURCE_DATE_EPOCH 3 \
+	rpm -U --define "%__transaction_syslog_target stderr" \
+		/build/RPMS/noarch/bbb-1.3-5.noarch.rpm
+],
+[0],
+[],
+[Transaction ID 3 started
+replace: bbb-1.3-5.noarch (from: aaa-1.2-1.noarch): success
+erase: aaa-1.2-1.noarch (from: bbb-1.3-5.noarch): success
+Transaction ID 3 finished: 0
+])
+
+RPMTEST_CHECK([
+runroot --setenv SOURCE_DATE_EPOCH 4 \
+	rpm -e --define "%__transaction_syslog_target stderr" \
+		bbb
+],
+[0],
+[],
+[Transaction ID 4 started
+erase: bbb-1.3-5.noarch: success
+Transaction ID 4 finished: 0
+])
 RPMTEST_CLEANUP
