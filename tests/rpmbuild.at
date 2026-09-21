@@ -906,6 +906,30 @@ test -f $RPMTEST/tmp/gotcha
 [])
 RPMTEST_CLEANUP
 
+RPMTEST_SETUP_RW([rpmbuild -ts <evil tarball name>])
+AT_KEYWORDS([build])
+
+RPMTEST_CHECK([
+mkdir -p "${RPMTEST}/tmp/hello;touch /tmp"
+cp "${RPMDATA}/SOURCES/hello-2.0.tar.gz" "${RPMTEST}/tmp/hello;touch /tmp/"
+cp "${RPMDATA}/SOURCES/hello-2.0.tar.gz" "${RPMTEST}/tmp/hello;touch /tmp/rpmbuild_injected;#.tar.gz"
+runroot rpmbuild --quiet -ts "/tmp/hello;touch /tmp/rpmbuild_injected;#.tar.gz"
+runroot rpm -qpl /build/SRPMS/hello-2.0-1.src.rpm
+],
+[0],
+[hello-2.0.tar.gz
+hello.spec
+],
+[])
+
+RPMTEST_CHECK([
+test -f $RPMTEST/tmp/rpmbuild_injected
+],
+[1],
+[],
+[])
+RPMTEST_CLEANUP
+
 # weird filename survival test
 RPMTEST_SETUP_RW([rpmbuild package with weird filenames])
 AT_KEYWORDS([build])
