@@ -86,15 +86,26 @@ static const struct archiveType_s *getArchiver(const char *fn)
     return archiver;
 }
 
+/* shell-escape a string for safe inclusion in a command */
+static char *shellEscape(const char *s)
+{
+    char *escaped = NULL;
+    const char *args[] = { s, NULL };
+    rpmExpandThisMacro(NULL, "shescape", (ARGV_const_t)args, &escaped, 0);
+    return escaped;
+}
+
 static char *doUncompress(const char *fn)
 {
     char *cmd = NULL;
     const struct archiveType_s *at = getArchiver(fn);
     if (at) {
+	char *qfn = shellEscape(fn);
 	cmd = rpmExpand(at->setTZ ? "TZ=UTC " : "",
 			at->cmd, " ", at->unpack, NULL);
 	/* path must not be expanded */
-	cmd = rstrscat(&cmd, " ", fn, NULL);
+	cmd = rstrscat(&cmd, " ", qfn ? qfn : "", NULL);
+	free(qfn);
     }
     return cmd;
 }
@@ -167,6 +178,7 @@ static char *doUntar(const char *fn)
     const struct archiveType_s *at = NULL;
     char *buf = NULL;
     char *tar = NULL;
+    char *qfn = NULL;
     const char *taropts = rpmIsVerbose() ? "-xvvof" : "-xof";
     char *mkdir = NULL;
     char *stripcd = NULL;
@@ -211,6 +223,8 @@ static char *doUntar(const char *fn)
 	stripcd = xstrdup("");
     }
     tar = rpmGetPath("%{__tar}", NULL);
+    if ((qfn = shellEscape(fn)) == NULL)
+	goto exit;
     if (at->compressed != COMPRESSED_NOT) {
 	char *zipper = NULL;
 
@@ -218,27 +232,31 @@ static char *doUntar(const char *fn)
 			   at->cmd, " ", at->unpack, " ",
 			   rpmIsVerbose() ? "" : at->quiet, NULL);
 	if (needtar) {
-	    rasprintf(&buf, "%s %s '%s' | %s %s - %s", mkdir, zipper, fn, tar, taropts, stripcd);
+	    rasprintf(&buf, "%s %s %s | %s %s - %s", mkdir, zipper, qfn, tar, taropts, stripcd);
 	} else if (at->compressed == COMPRESSED_GEM) {
 	    auto bn = fs::path(fn).stem();
 	    char *gem = rpmGetPath("%{__gem}", NULL);
+	    char *qgemspec = NULL;
 
-	    rasprintf(&buf, "%s '%s' && %s spec '%s' --ruby > '%s.gemspec'",
-			zipper, fn, gem, fn, bn.c_str());
+	    qgemspec = shellEscape(bn.c_str());
+	    rasprintf(&buf, "%s %s && %s spec %s --ruby > %s.gemspec",
+			zipper, qfn, gem, qfn, qgemspec);
 
 	    free(gem);
+	    free(qgemspec);
 	} else {
-	    rasprintf(&buf, "%s%s '%s' %s", mkdir, zipper, fn, stripcd);
+	    rasprintf(&buf, "%s%s %s %s", mkdir, zipper, qfn, stripcd);
 	}
 	free(zipper);
     } else {
-	rasprintf(&buf, "%s %s %s '%s' %s", mkdir, tar, taropts, fn, stripcd);
+	rasprintf(&buf, "%s %s %s %s %s", mkdir, tar, taropts, qfn, stripcd);
     }
 
 exit:
     free(tar);
     free(mkdir);
     free(stripcd);
+    free(qfn);
     return buf;
 }
 

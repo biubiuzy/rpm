@@ -430,6 +430,44 @@ rpmuncompress -x -C test-1.2.3-7 /data/SOURCES/test-1.2.3.7z
 [0],
 [])
 
+RPMTEST_SETUP([uncompress 4])
+AT_KEYWORDS([macros])
+RPMTEST_CHECK([
+echo hello | gzip -c > ${RPMTEST}/tmp/"poc;echo pwned>marker;#.gz"
+runroot_other ${RPM_CONFIGDIR}/rpmuncompress "/tmp/poc;echo pwned>marker;#.gz"
+test -s ${RPMTEST}/marker && echo "VULNERABLE" || echo "SAFE"
+],
+[0],
+[hello
+SAFE
+])
+RPMTEST_CLEANUP
+
+RPMTEST_SETUP([uncompress 5])
+AT_KEYWORDS([macros])
+RPMTEST_CHECK([
+cp ${RPMDATA}/SOURCES/hello-2.0.tar.gz "${RPMTEST}/tmp/evil';echo pwned>marker;'#.tar.gz"
+runroot_other ${RPM_CONFIGDIR}/rpmuncompress -x "/tmp/evil';echo pwned>marker;'#.tar.gz"
+test -f ${RPMTEST}/hello-2.0/hello.c && echo "EXTRACTED"
+test -s ${RPMTEST}/marker && echo "VULNERABLE" || echo "SAFE"
+],
+[0],
+[EXTRACTED
+SAFE
+])
+RPMTEST_CLEANUP
+
+RPMTEST_SETUP([uncompress 6])
+AT_KEYWORDS([macros])
+RPMTEST_CHECK([
+echo faketwelvebytes > ${RPMTEST}/tmp/"evil'test.gem"
+runroot_other ${RPM_CONFIGDIR}/rpmuncompress -n -x "/tmp/evil'test.gem" 2>cmd
+grep -qF "spec '/tmp/evil'\''test.gem' --ruby > 'evil'\''test.gemspec'" cmd && echo "ESCAPED" || echo "RAW"
+],
+[0],
+[ESCAPED
+])
+RPMTEST_CLEANUP
 
 RPMTEST_CHECK([
 find test-1.2.3 | sort
