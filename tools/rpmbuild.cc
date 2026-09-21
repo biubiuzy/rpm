@@ -376,7 +376,7 @@ static char * getTarSpec(const char *arg)
     char tarbuf[BUFSIZ];
     int gotspec = 0;
     FD_t fd = NULL;
-    static const char *tryspec[] = { "Specfile", "\\*.spec", NULL };
+    static const char *tryspec[] = { "Specfile", "*.spec", NULL };
 
     specFile = rpmGetPath("%{_specdir}/", "rpm-spec.XXXXXX", NULL);
     if (!(fd = rpmMkTemp(specFile)))
@@ -387,9 +387,9 @@ static char * getTarSpec(const char *arg)
 	char *cmd;
 	int specfiles = 0;
 
-	cmd = rpmExpand("%{uncompress: ", arg, "} | ",
-			"%{__tar} xOvof - --wildcards ", *spec,
-			" 2>&1 > ", specFile, NULL);
+	cmd = rpmExpand("%{uncompress:%{shescape:", arg, "}} | ",
+			"%{__tar} xOvof - --wildcards %{shescape:", *spec,
+			"} 2>&1 > %{shescape:", specFile, "}", NULL);
 
 	if (!(fp = popen(cmd, "r"))) {
 	    rpmlog(RPMLOG_ERR, _("Failed to open tar pipe: %m\n"));
