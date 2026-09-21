@@ -1,14 +1,13 @@
-FROM quay.io/fedora/fedora:44 AS base
+ARG OS_RELEASE=fedora:44
+ARG BASE_IMAGE=base
+
+FROM quay.io/fedora/${OS_RELEASE} AS base
 LABEL com.github.containers.toolbox="true"
 MAINTAINER rpm-maint@lists.rpm.org
 
 RUN echo -e "deltarpm=0\ninstall_weak_deps=0\ntsflags=nodocs" >> /etc/dnf/dnf.conf
 RUN rpm --quiet -q fedora-repos-modular && rpm -e fedora-repos-modular ||:
 RUN sed -i -e "s:^enabled=.$:enabled=0:g" /etc/yum.repos.d/*openh264.repo
-# updates disabled for a stable environment
-RUN sed -i -e "s:^enabled=.$:enabled=0:g" /etc/yum.repos.d/*updates*.repo
-# dummy for controlling per-repo gpgcheck via Semaphore setup
-RUN sed -i -e "s:^gpgcheck=.$:gpgcheck=1:g" /etc/yum.repos.d/*.repo
 RUN dnf -y install \
   autoconf \
   bubblewrap \
@@ -56,9 +55,16 @@ RUN dnf -y install \
   scdoc \
   scd2html \
   sequoia-sq \
-  nss-altfiles
+  nss-altfiles \
+  gcc \
+  gcc-c++ \
+  libasan \
+  libubsan \
+  clang \
+  compiler-rt \
+  libomp-devel
 # If updates to specific packages are needed, do it here
-RUN dnf -y --enablerepo=updates install "rpm-sequoia-devel >= 1.10.2"
+RUN dnf -y --enablerepo=updates install "rpm-sequoia-devel >= 1.10.3-1"
 
 # Install some development tools
 RUN dnf -y install \
@@ -66,24 +72,6 @@ RUN dnf -y install \
     gdb \
     strace \
     valgrind
-
-# Install the requested toolchain
-ARG TOOLCHAIN=gcc
-RUN case "$TOOLCHAIN" in \
-        gcc) \
-            dnf -y install \
-                gcc \
-                gcc-c++ \
-                libasan \
-                libubsan \
-        ;; \
-        clang) \
-            dnf -y install \
-                clang \
-                compiler-rt \
-                libomp-devel \
-        ;; \
-    esac
 
 RUN dnf clean all
 
@@ -111,7 +99,7 @@ RUN rpm -e --nodeps --nodb \
 WORKDIR /
 CMD /bin/bash
 
-FROM base AS full
+FROM ${BASE_IMAGE} AS full
 ARG TOOLCHAIN=gcc
 
 WORKDIR /srv/rpm
